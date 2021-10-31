@@ -4,7 +4,7 @@ use std::cell::RefCell;
 use std::fmt;
 use std::sync::Arc;
 
-use util::divide_ternary_sizes;
+use util::{divide_ternary_sizes, rough_int_pow};
 
 #[derive(Clone)]
 pub enum TernaryTreeList<T> {
@@ -162,9 +162,11 @@ impl<T: Clone + fmt::Display + Eq + PartialEq> TernaryTreeList<T> {
   }
 
   pub fn get(&self, idx: usize) -> Option<T> {
-    None
-
-    // TODO
+    if self.is_empty() {
+      None
+    } else {
+      Some(self.unsafe_get(idx))
+    }
   }
 
   // returns -1 if (not foun)
@@ -300,13 +302,13 @@ impl<T: Clone + fmt::Display + Eq + PartialEq> TernaryTreeList<T> {
     }
   }
 
-  fn write_leaves(&mut self, acc: /* var */ &mut [TernaryTreeList<T>], counter: &RefCell<usize>) {
+  fn write_leaves(&self, acc: /* var */ &mut [TernaryTreeList<T>], counter: &RefCell<usize>) {
     if self.is_empty() {
       return;
     }
 
     match self {
-      Leaf { value, .. } => {
+      Leaf { .. } => {
         let idx = counter.take();
         acc[idx] = self.to_owned();
 
@@ -331,22 +333,18 @@ impl<T: Clone + fmt::Display + Eq + PartialEq> TernaryTreeList<T> {
     }
   }
 
-  pub fn to_leaves(&self) -> Vec<TernaryTreeList<T>> {
+  pub fn to_leaves(&mut self) -> Vec<TernaryTreeList<T>> {
     let mut acc: Vec<TernaryTreeList<T>> = Vec::with_capacity(self.len());
     let counter: RefCell<usize> = RefCell::new(5);
-    Self::write_leaves(&mut self, &mut acc, &counter);
-    return acc;
+    Self::write_leaves(self, &mut acc, &counter);
+    acc
   }
 
   pub fn unsafe_get(&self, original_idx: usize) -> T {
-    let mut tree_parent = Some(Arc::new(*self));
+    let mut tree_parent = Some(Arc::new((*self).to_owned()));
     let mut idx = original_idx;
     while let Some(tree) = tree_parent {
-      if idx < 0 {
-        unreachable!("Cannot index negative number")
-      }
-
-      match *tree {
+      match &*tree {
         Leaf { value, .. } => {
           if idx == 0 {
             return value.to_owned();
@@ -364,6 +362,655 @@ impl<T: Clone + fmt::Display + Eq + PartialEq> TernaryTreeList<T> {
           if idx > size - 1 {
             unreachable!("Index too large")
           }
+          let left_size = match &left {
+            Some(br) => br.len(),
+            None => 0,
+          };
+          let middle_size = match &middle {
+            Some(br) => br.len(),
+            None => 0,
+          };
+          let right_size = match &right {
+            Some(br) => br.len(),
+            None => 0,
+          };
+
+          if left_size + middle_size + right_size != *size {
+            unreachable!("tree.size does not match sum case branch sizes");
+          }
+
+          if idx < left_size {
+            tree_parent = left.to_owned();
+          } else if idx < left_size + middle_size {
+            tree_parent = middle.to_owned();
+            idx -= left_size;
+          } else {
+            tree_parent = right.to_owned();
+            idx -= left_size + middle_size;
+          }
+        }
+      }
+    }
+
+    unreachable!("Failed to get ${idx}")
+  }
+
+  pub fn first(&self) -> T {
+    if self.is_empty() {
+      unreachable!("Cannot get from empty list")
+    } else {
+      self.unsafe_get(0)
+    }
+  }
+
+  pub fn last(&self) -> T {
+    if self.is_empty() {
+      unreachable!("Cannot get from empty list")
+    } else {
+      self.unsafe_get(self.len() - 1)
+    }
+  }
+  pub fn assoc(&self, idx: usize, item: T) -> Self {
+    if idx > self.len() - 1 {
+      unreachable!("Index too large");
+    }
+
+    match self {
+      Leaf { value, .. } => {
+        if idx == 0 {
+          Leaf {
+            size: 1,
+            value: value.to_owned(),
+          }
+        } else {
+          unreachable!("Cannot get from leaf with index ${idx}")
+        }
+      }
+      Branch {
+        left,
+        middle,
+        right,
+        size,
+        ..
+      } => {
+        let left_size = match left {
+          Some(br) => br.len(),
+          None => 0,
+        };
+        let middle_size = match middle {
+          Some(br) => br.len(),
+          None => 0,
+        };
+        let right_size = match right {
+          Some(br) => br.len(),
+          None => 0,
+        };
+
+        if left_size + middle_size + right_size != *size {
+          unreachable!("tree.size does not match sum case branch sizes");
+        }
+
+        if idx < left_size {
+          match left {
+            Some(br) => {
+              let changed_branch = Arc::new(br.assoc(idx, item));
+              Branch {
+                size: size.to_owned(),
+                depth: decide_parent_depth_op(&[
+                  &Some(changed_branch.to_owned()),
+                  &*middle,
+                  &*right,
+                ]),
+                left: Some(changed_branch.to_owned()),
+                middle: middle.to_owned(),
+                right: right.to_owned(),
+              }
+            }
+            None => unreachable!("expected data in left branch"),
+          }
+        } else if idx < left_size + middle_size {
+          match middle {
+            Some(br) => {
+              let changed_branch = Arc::new(br.assoc(idx - left_size, item));
+              Branch {
+                size: size.to_owned(),
+                depth: decide_parent_depth_op(&[&*left, &Some(changed_branch.to_owned()), &*right]),
+                left: left.to_owned(),
+                middle: Some(changed_branch.to_owned()),
+                right: right.to_owned(),
+              }
+            }
+            None => unreachable!("expected data in middle branch"),
+          }
+        } else {
+          match right {
+            Some(br) => {
+              let changed_branch = Arc::new(br.assoc(idx - left_size - middle_size, item));
+              Branch {
+                size: size.to_owned(),
+                depth: decide_parent_depth_op(&[
+                  &*left,
+                  &*middle,
+                  &Some(changed_branch.to_owned()),
+                ]),
+                left: left.to_owned(),
+                middle: middle.to_owned(),
+                right: Some(changed_branch.to_owned()),
+              }
+            }
+            None => unreachable!("expected data in right branch"),
+          }
+        }
+      }
+    }
+  }
+  pub fn dissoc(&self, idx: usize) -> Self {
+    if self.is_empty() {
+      unreachable!("Cannot remove from empty list");
+    }
+
+    if idx > self.len() - 1 {
+      unreachable!("Index too large ${idx}");
+    }
+
+    if self.len() == 1 {
+      return Branch {
+        size: 0,
+        depth: 1,
+        left: None,
+        middle: None,
+        right: None,
+      };
+    }
+
+    match self {
+      Leaf { .. } => unreachable!("dissoc should be handled at branches"),
+      Branch {
+        left,
+        middle,
+        right,
+        size,
+        ..
+      } => {
+        let left_size = match left {
+          Some(br) => br.len(),
+          None => 0,
+        };
+        let middle_size = match middle {
+          Some(br) => br.len(),
+          None => 0,
+        };
+        let right_size = match right {
+          Some(br) => br.len(),
+          None => 0,
+        };
+
+        if left_size + middle_size + right_size != *size {
+          unreachable!("tree.size does not match sum from branch sizes");
+        }
+
+        let result: Self;
+
+        if idx < left_size {
+          match &left {
+            Some(br) => {
+              let changed_branch = br.dissoc(idx);
+              result = if changed_branch.is_empty() {
+                Branch {
+                  size: *size - 1,
+                  depth: decide_parent_depth_op(&[middle, right]),
+                  left: middle.to_owned(),
+                  middle: right.to_owned(),
+                  right: Some(Arc::new(make_empty_node())),
+                }
+              } else {
+                Branch {
+                  size: *size - 1,
+                  depth: decide_parent_depth_op(&[
+                    &Some(Arc::new(changed_branch.to_owned())),
+                    middle,
+                    right,
+                  ]),
+                  left: Some(Arc::new(changed_branch.to_owned())),
+                  middle: middle.to_owned(),
+                  right: right.to_owned(),
+                }
+              }
+            }
+            None => unreachable!("expected data in left branch"),
+          }
+        } else if idx < left_size + middle_size {
+          match &middle {
+            Some(br) => {
+              let changed_branch = br.dissoc(idx - left_size);
+              result = if changed_branch.is_empty() {
+                Branch {
+                  size: *size - 1,
+                  depth: decide_parent_depth_op(&[left, &Some(Arc::new(changed_branch)), right]),
+                  left: left.to_owned(),
+                  middle: right.to_owned(),
+                  right: Some(Arc::new(make_empty_node())),
+                }
+              } else {
+                Branch {
+                  size: *size - 1,
+                  depth: decide_parent_depth_op(&[left, &Some(Arc::new(changed_branch)), right]),
+                  left: left.to_owned(),
+                  middle: Some(Arc::new(make_empty_node())),
+                  right: right.to_owned(),
+                }
+              }
+            }
+            None => unreachable!("expected data in middle branch"),
+          }
+        } else {
+          match &right {
+            Some(br) => {
+              let changed_branch = br.dissoc(idx - left_size - middle_size);
+              result = Branch {
+                size: *size - 1,
+                depth: decide_parent_depth_op(&[
+                  left,
+                  middle,
+                  &Some(Arc::new(changed_branch.to_owned())),
+                ]),
+                left: left.to_owned(),
+                middle: middle.to_owned(),
+                right: Some(Arc::new(changed_branch.to_owned())),
+              }
+            }
+            None => unreachable!("expected data in right branch"),
+          }
+        }
+
+        match &result {
+          Branch {
+            left,
+            middle,
+            right,
+            depth,
+            size,
+          } => {
+            if middle == &None {
+              match left {
+                Some(br) => (**br).clone(),
+                None => make_empty_node(),
+              }
+            } else {
+              Branch {
+                left: left.to_owned(),
+                middle: middle.to_owned(),
+                right: right.to_owned(),
+                depth: *depth,
+                size: *size,
+              }
+            }
+          }
+          Leaf { .. } => unreachable!("should not found leaf"),
+        }
+      }
+    }
+  }
+  pub fn rest(&self) -> Self {
+    if self.is_empty() {
+      unreachable!("calling rest on empty")
+    }
+
+    self.dissoc(0)
+  }
+  pub fn butlast(&self) -> Self {
+    if self.is_empty() {
+      unreachable!("calling rest on empty")
+    }
+    self.dissoc(self.len() - 1)
+  }
+
+  pub fn insert(&self, idx: usize, item: T, after: bool) -> Self {
+    if self.is_empty() {
+      unreachable!("Empty node is not a correct position for inserting")
+    }
+
+    match self {
+      Leaf { .. } => {
+        if after {
+          Branch {
+            depth: self.get_depth() + 1,
+            size: 2,
+            left: Some(Arc::new(self.to_owned())),
+            middle: Some(Arc::new(Leaf {
+              size: 1,
+              value: item,
+            })),
+            right: Some(Arc::new(make_empty_node())),
+          }
+        } else {
+          Branch {
+            depth: self.get_depth() + 1,
+            size: 2,
+            left: Some(Arc::new(Leaf {
+              size: 1,
+              value: item,
+            })),
+            middle: Some(Arc::new(self.to_owned())),
+            right: Some(Arc::new(make_empty_node())),
+          }
+        }
+      }
+      Branch {
+        left,
+        middle,
+        right,
+        size,
+        ..
+      } => {
+        if self.len() == 1 {
+          if after {
+            // in compact mode, values placed at left
+            return Branch {
+              size: 2,
+              depth: 2,
+              left: left.to_owned(),
+              middle: Some(Arc::new(Leaf {
+                size: 1,
+                value: item,
+              })),
+              right: Some(Arc::new(make_empty_node())),
+            };
+          } else {
+            return Branch {
+              size: 2,
+              depth: decide_parent_depth_op(&[middle]),
+              left: Some(Arc::new(Leaf {
+                size: 1,
+                value: item,
+              })),
+              middle: left.to_owned(),
+              right: Some(Arc::new(make_empty_node())),
+            };
+          }
+        }
+
+        if self.len() == 2 && middle.is_some() {
+          if after {
+            if idx == 0 {
+              return Branch {
+                size: 3,
+                depth: 2,
+                left: left.to_owned(),
+                middle: Some(Arc::new(Leaf {
+                  size: 1,
+                  value: item,
+                })),
+                right: middle.to_owned(),
+              };
+            }
+            if idx == 1 {
+              return Branch {
+                size: 3,
+                depth: 2,
+                left: left.to_owned(),
+                middle: middle.to_owned(),
+                right: Some(Arc::new(Leaf {
+                  size: 1,
+                  value: item,
+                })),
+              };
+            } else {
+              unreachable!("cannot insert after position 2 since only 2 elements here");
+            }
+          } else if idx == 0 {
+            return Branch {
+              size: 3,
+              depth: 2,
+              left: Some(Arc::new(Leaf {
+                size: 1,
+                value: item,
+              })),
+              middle: left.to_owned(),
+              right: middle.to_owned(),
+            };
+          } else if idx == 1 {
+            return Branch {
+              size: 3,
+              depth: 2,
+              left: left.to_owned(),
+              middle: Some(Arc::new(Leaf {
+                size: 1,
+                value: item,
+              })),
+              right: middle.to_owned(),
+            };
+          } else {
+            unreachable!("cannot insert before position 2 since only 2 elements here")
+          }
+        }
+
+        let left_size = match left {
+          Some(br) => br.len(),
+          None => 0,
+        };
+        let middle_size = match middle {
+          Some(br) => br.len(),
+          None => 0,
+        };
+        let right_size = match right {
+          Some(br) => br.len(),
+          None => 0,
+        };
+
+        if left_size + middle_size + right_size != *size {
+          unreachable!("tree.size does not match sum case branch sizes");
+        }
+
+        // echo "picking: ", idx, " ", left_size, " ", middle_size, " ", right_size
+
+        if idx == 0 && !after && left_size >= middle_size && left_size >= right_size {
+          return Branch {
+            size: *size + 1,
+            depth: self.get_depth() + 1,
+            left: Some(Arc::new(Leaf {
+              size: 1,
+              value: item,
+            })),
+            middle: Some(Arc::new(self.to_owned())),
+            right: Some(Arc::new(make_empty_node())),
+          };
+        }
+
+        if idx == *size - 1 && after && right_size >= middle_size && right_size >= left_size {
+          return Branch {
+            size: *size + 1,
+            depth: self.get_depth() + 1,
+            left: Some(Arc::new(self.to_owned())),
+            middle: Some(Arc::new(Leaf {
+              size: 1,
+              value: item,
+            })),
+            right: Some(Arc::new(make_empty_node())),
+          };
+        }
+
+        if after && idx == *size - 1 && right_size == 0 && middle_size >= left_size {
+          return Branch {
+            size: *size + 1,
+            depth: self.get_depth(),
+            left: left.to_owned(),
+            middle: middle.to_owned(),
+            right: Some(Arc::new(Leaf {
+              size: 1,
+              value: item,
+            })),
+          };
+        }
+
+        if !after && idx == 0 && right_size == 0 && middle_size >= right_size {
+          return Branch {
+            size: *size + 1,
+            depth: self.get_depth(),
+            left: Some(Arc::new(Leaf {
+              size: 1,
+              value: item,
+            })),
+            middle: left.to_owned(),
+            right: middle.to_owned(),
+          };
+        }
+
+        if idx < left_size {
+          let changed_branch = match left {
+            Some(br) => br.insert(idx, item, after),
+            None => unreachable!("expected data on left branch"),
+          };
+          Branch {
+            size: *size + 1,
+            depth: decide_parent_depth_op(&[
+              &Some(Arc::new(changed_branch.to_owned())),
+              middle,
+              right,
+            ]),
+            left: Some(Arc::new(changed_branch.to_owned())),
+            middle: middle.to_owned(),
+            right: right.to_owned(),
+          }
+        } else if idx < left_size + middle_size {
+          let changed_branch = match middle {
+            Some(br) => br.insert(idx - left_size, item, after),
+            None => unreachable!("expected data on middle branch"),
+          };
+
+          Branch {
+            size: *size + 1,
+            depth: decide_parent_depth_op(&[
+              left,
+              &Some(Arc::new(changed_branch.to_owned())),
+              right,
+            ]),
+            left: left.to_owned(),
+            middle: Some(Arc::new(changed_branch.to_owned())),
+            right: right.to_owned(),
+          }
+        } else {
+          let changed_branch = match right {
+            Some(br) => br.insert(idx - left_size - middle_size, item, after),
+            None => unreachable!("expected data on right branch"),
+          };
+
+          Branch {
+            size: *size + 1,
+            depth: decide_parent_depth_op(&[
+              left,
+              middle,
+              &Some(Arc::new(changed_branch.to_owned())),
+            ]),
+            left: left.to_owned(),
+            middle: middle.to_owned(),
+            right: Some(Arc::new(changed_branch.to_owned())),
+          }
+        }
+      }
+    }
+  }
+  pub fn assoc_before(&self, idx: usize, item: T) -> Self {
+    self.insert(idx, item, false)
+  }
+  pub fn assoc_after(&self, idx: usize, item: T) -> Self {
+    self.insert(idx, item, true)
+  }
+  // this function mutates original tree to make it more balanced
+  pub fn force_inplace_balancing(&mut self) {
+    let ys = self.to_owned().to_leaves();
+    match self {
+      Branch {
+        ref mut left,
+        ref mut middle,
+        ref mut right,
+        ref mut depth,
+        ..
+      } => {
+        // echo "Force inplace balancing case list: ", tree.size
+        let new_tree = Self::make_list(ys.len(), 0, &ys);
+        // let new_tree = initTernaryTreeList(ys)
+        match new_tree {
+          Branch {
+            left: left2,
+            right: right2,
+            middle: middle2,
+            ..
+          } => {
+            *left = left2.to_owned();
+            *middle = middle2.to_owned();
+            *right = right2.to_owned();
+            *depth = decide_parent_depth_op(&[&left2, &middle2, &right2]);
+          }
+          Leaf { .. } => {
+            unreachable!("expected leaf data")
+          }
+        }
+      }
+      Leaf { .. } => {}
+    }
+  }
+  // TODO, need better strategy for detecting
+  pub fn maybe_reblance(&mut self) {
+    let current_depth = self.get_depth();
+    if current_depth > 50 && rough_int_pow(3, current_depth - 50) > self.len() {
+      self.force_inplace_balancing()
+    }
+  }
+
+  pub fn prepend(&self, item: T, disable_balancing: bool) -> Self {
+    if self.is_empty() {
+      return Leaf {
+        size: 1,
+        value: item,
+      };
+    }
+
+    let mut result = self.insert(0, item, false);
+
+    if !disable_balancing {
+      result.maybe_reblance();
+    }
+
+    result
+  }
+  pub fn append(&self, item: T, disable_balancing: bool) -> Self {
+    if self.is_empty() {
+      return Leaf {
+        size: 1,
+        value: item,
+      };
+    }
+    let mut result = self.insert(self.len() - 1, item, true);
+
+    if !disable_balancing {
+      result.maybe_reblance();
+    }
+    result
+  }
+  pub fn concat(xs_groups: &[TernaryTreeList<T>]) -> Self {
+    let mut result = Self::make_list(xs_groups.len(), 0, xs_groups);
+    result.maybe_reblance();
+    result
+  }
+  pub fn check_list_structure(&self) -> Result<(), String> {
+    if self.is_empty() {
+      Ok(())
+    } else {
+      match self {
+        Leaf { size, .. } => {
+          if *size != 1 {
+            return Err(String::from("Bad size at node ${formatListInline(tree)}"));
+          }
+          Ok(())
+        }
+        Branch {
+          left,
+          middle,
+          right,
+          size,
+          depth,
+        } => {
           let left_size = match left {
             Some(br) => br.len(),
             None => 0,
@@ -376,658 +1023,210 @@ impl<T: Clone + fmt::Display + Eq + PartialEq> TernaryTreeList<T> {
             Some(br) => br.len(),
             None => 0,
           };
-
-          if left_size + middle_size + right_size != size {
-            unreachable!("tree.size does not match sum case branch sizes");
+          if *size != left_size + middle_size + right_size {
+            unreachable!("Bad size at branch ${formatListInline(tree)}");
           }
 
-          if idx < left_size {
-            tree_parent = left.to_owned();
-          } else if idx < left_size + middle_size {
-            tree_parent = middle.to_owned();
-            idx = idx - left_size;
-          } else {
-            tree_parent = right.to_owned();
-            idx = idx - left_size - middle_size;
+          if *depth != decide_parent_depth_op(&[left, middle, right]) {
+            return Err(format!("Bad depth at branch {}", self.format_inline()));
           }
+
+          if let Some(br) = left {
+            br.check_list_structure()?;
+          }
+          if let Some(br) = middle {
+            br.check_list_structure()?;
+          }
+          if let Some(br) = right {
+            br.check_list_structure()?;
+          }
+
+          Ok(())
         }
       }
     }
+  }
+  // excludes value at end_idx, kept aligned with JS & Clojure
+  pub fn slice(&self, start_idx: usize, end_idx: usize) -> Self {
+    // echo "slice {tree.formatListInline}: {start_idx}..{end_idx}"
+    if end_idx > self.len() {
+      unreachable!("Slice range too large {end_idx} for {tree}");
+    }
+    if start_idx > end_idx {
+      unreachable!("Invalid slice range {start_idx}..{end_idx} for {tree}");
+    }
+    if start_idx == end_idx {
+      return Branch {
+        size: 0,
+        depth: 0,
+        left: None,
+        middle: None,
+        right: None,
+      };
+    }
 
-    unreachable!("Failed to get ${idx}")
+    match self {
+      Leaf { .. } => {
+        if start_idx == 0 && end_idx == 1 {
+          self.to_owned()
+        } else {
+          unreachable!("Invalid slice range for a leaf: ${start_idx} ${end_idx}");
+        }
+      }
+      Branch {
+        left,
+        right,
+        middle,
+        ..
+      } => {
+        if start_idx == 0 && end_idx == self.len() {
+          return self.to_owned();
+        }
+
+        let left_size = match left {
+          Some(br) => br.len(),
+          None => 0,
+        };
+        let middle_size = match middle {
+          Some(br) => br.len(),
+          None => 0,
+        };
+        let right_size = match right {
+          Some(br) => br.len(),
+          None => 0,
+        };
+
+        // echo "sizes: {left_size} {middle_size} {right_size}"
+
+        if start_idx >= left_size + middle_size {
+          match right {
+            Some(br) => {
+              return br.slice(
+                start_idx - left_size - middle_size,
+                end_idx - left_size - middle_size,
+              );
+            }
+            None => unreachable!("expected data on right branch"),
+          }
+        }
+        if start_idx >= left_size {
+          if end_idx <= left_size + middle_size {
+            match middle {
+              Some(br) => {
+                return br.slice(start_idx - left_size, end_idx - left_size);
+              }
+              None => unreachable!("expected data on middle branch"),
+            }
+          } else {
+            match (middle, right) {
+              (Some(middle_br), Some(right_br)) => {
+                let middle_cut = middle_br.slice(start_idx - left_size, middle_size);
+                let right_cut = right_br.slice(0, end_idx - left_size - middle_size);
+                return Self::concat(&[middle_cut, right_cut]);
+              }
+              (_, _) => unreachable!("expected data on middle and right branches"),
+            }
+          }
+        }
+
+        if end_idx <= left_size {
+          match left {
+            Some(br) => {
+              return br.slice(start_idx, end_idx);
+            }
+            None => {
+              unreachable!("expected data on right branch")
+            }
+          }
+        }
+
+        if end_idx <= left_size + middle_size {
+          match (left, middle) {
+            (Some(left_br), Some(middle_br)) => {
+              let left_cut = left_br.slice(start_idx, left_size);
+              let middle_cut = middle_br.slice(0, end_idx - left_size);
+              return Self::concat(&[left_cut, middle_cut]);
+            }
+            (_, _) => unreachable!("expected some data on left and middle branches"),
+          }
+        }
+
+        if end_idx <= left_size + middle_size + right_size {
+          match (left, right) {
+            (Some(left_br), Some(right_br)) => {
+              let left_cut = left_br.slice(start_idx, left_size);
+              let right_cut = right_br.slice(0, end_idx - left_size - middle_size);
+              match middle {
+                Some(br) => {
+                  return Self::concat(&[left_cut, (**br).clone(), right_cut]);
+                }
+                None => {
+                  return Self::concat(&[left_cut, right_cut]);
+                }
+              }
+            }
+            (_, _) => unreachable!("expected some data on left and right branches"),
+          }
+        }
+        unreachable!("Unknown");
+      }
+    }
+  }
+
+  pub fn reverse(&self) -> Self {
+    if self.is_empty() {
+      return self.to_owned();
+    }
+
+    match self {
+      Leaf { .. } => self.to_owned(),
+      Branch {
+        left,
+        middle,
+        right,
+        size,
+        depth,
+      } => Branch {
+        size: *size,
+        depth: *depth,
+        left: right.to_owned().map(|x| Arc::new(x.reverse())),
+        middle: middle.to_owned().map(|x| Arc::new(x.reverse())),
+        right: left.to_owned().map(|x| Arc::new(x.reverse())),
+      },
+    }
+  }
+  pub fn map<V>(&self, f: Arc<dyn Fn(&T) -> V>) -> TernaryTreeList<V> {
+    if self.is_empty() {
+      return Branch {
+        size: 0,
+        depth: 1,
+        left: None,
+        middle: None,
+        right: None,
+      };
+    }
+
+    match self {
+      Leaf { value, .. } => Leaf {
+        value: f(value),
+        size: 1,
+      },
+      Branch {
+        left,
+        middle,
+        right,
+        size,
+        depth,
+      } => Branch {
+        size: *size,
+        depth: *depth,
+        left: left.to_owned().map(|br| Arc::new(br.map(f.clone()))),
+        middle: middle.to_owned().map(|br| Arc::new(br.map(f.clone()))),
+        right: right.to_owned().map(|br| Arc::new(br.map(f.clone()))),
+      },
+    }
   }
 }
-
-// pub fn first(&self) -> T {
-//   if (listLen(tree) > 0) {
-//     return listGet(tree, 0);
-//   } else {
-//     throw new Error("Cannot get from empty list");
-//   }
-// }
-
-// pub fn last(&self) -> T {
-//   if (listLen(tree) > 0) {
-//     return listGet(tree, listLen(tree) - 1);
-//   } else {
-//     throw new Error("Cannot get from empty list");
-//   }
-// }
-
-// pub fn assocList(&self, idx: number, item: T): TernaryTreeList<T> {
-//   if (idx < 0) {
-//     throw new Error("Cannot index negative number");
-//   }
-//   if (idx > tree.size - 1) {
-//     throw new Error("Index too large");
-//   }
-
-//   if (tree.kind === TernaryTreeKind.ternaryTreeLeaf) {
-//     if (idx === 0) {
-//       return { kind: TernaryTreeKind.ternaryTreeLeaf, size: 1, value: item } as TernaryTreeList<T>;
-//     } else {
-//       throw new Error(`Cannot get from leaf with index ${idx}`);
-//     }
-//   }
-
-//   let leftSize = listLen(tree.left);
-//   let middleSize = listLen(tree.middle);
-//   let rightSize = listLen(tree.right);
-
-//   if (leftSize + middleSize + rightSize !== tree.size) throw new Error("tree.size does not match sum case branch sizes");
-
-//   if (idx <= leftSize - 1) {
-//     let changedBranch = assocList(tree.left, idx, item);
-//     let result: TernaryTreeList<T> = {
-//       kind: TernaryTreeKind.ternaryTreeBranch,
-//       size: tree.size,
-//       depth: decideParentDepth(changedBranch, tree.middle, tree.right),
-//       left: changedBranch,
-//       middle: tree.middle,
-//       right: tree.right,
-//     };
-//     return result;
-//   } else if (idx <= leftSize + middleSize - 1) {
-//     let changedBranch = assocList(tree.middle, idx - leftSize, item);
-//     let result: TernaryTreeList<T> = {
-//       kind: TernaryTreeKind.ternaryTreeBranch,
-//       size: tree.size,
-//       depth: decideParentDepth(tree.left, changedBranch, tree.right),
-//       left: tree.left,
-//       middle: changedBranch,
-//       right: tree.right,
-//     };
-//     return result;
-//   } else {
-//     let changedBranch = assocList(tree.right, idx - leftSize - middleSize, item);
-//     let result: TernaryTreeList<T> = {
-//       kind: TernaryTreeKind.ternaryTreeBranch,
-//       size: tree.size,
-//       depth: decideParentDepth(tree.left, tree.middle, changedBranch),
-//       left: tree.left,
-//       middle: tree.middle,
-//       right: changedBranch,
-//     };
-//     return result;
-//   }
-// }
-
-// pub fn dissocList(&self, idx: number): TernaryTreeList<T> {
-//   if (tree == null) {
-//     throw new Error("dissoc does not work on null");
-//   }
-
-//   if (idx < 0) {
-//     throw new Error(`Index is negative ${idx}`);
-//   }
-
-//   if (listLen(tree) === 0) {
-//     throw new Error("Cannot remove from empty list");
-//   }
-
-//   if (idx > listLen(tree) - 1) {
-//     throw new Error(`Index too large ${idx}`);
-//   }
-
-//   if (listLen(tree) === 1) {
-//     return emptyBranch;
-//   }
-
-//   if (tree.kind === TernaryTreeKind.ternaryTreeLeaf) {
-//     throw new Error("dissoc should be handled at branches");
-//   }
-
-//   let leftSize = listLen(tree.left);
-//   let middleSize = listLen(tree.middle);
-//   let rightSize = listLen(tree.right);
-
-//   if (leftSize + middleSize + rightSize !== tree.size) {
-//     throw new Error("tree.size does not match sum from branch sizes");
-//   }
-
-//   let result: TernaryTreeList<T> = emptyBranch;
-
-//   if (idx <= leftSize - 1) {
-//     let changedBranch = dissocList(tree.left, idx);
-//     if (changedBranch == null || changedBranch.size === 0) {
-//       result = {
-//         kind: TernaryTreeKind.ternaryTreeBranch,
-//         size: tree.size - 1,
-//         depth: decideParentDepth(tree.middle, tree.right),
-//         left: tree.middle,
-//         middle: tree.right,
-//         right: emptyBranch,
-//       };
-//     } else {
-//       result = {
-//         kind: TernaryTreeKind.ternaryTreeBranch,
-//         size: tree.size - 1,
-//         depth: decideParentDepth(changedBranch, tree.middle, tree.right),
-//         left: changedBranch,
-//         middle: tree.middle,
-//         right: tree.right,
-//       };
-//     }
-//   } else if (idx <= leftSize + middleSize - 1) {
-//     let changedBranch = dissocList(tree.middle, idx - leftSize);
-//     if (changedBranch == null || changedBranch.size === 0) {
-//       result = {
-//         kind: TernaryTreeKind.ternaryTreeBranch,
-//         size: tree.size - 1,
-//         depth: decideParentDepth(tree.left, changedBranch, tree.right),
-//         left: tree.left,
-//         middle: tree.right,
-//         right: emptyBranch,
-//       };
-//     } else {
-//       result = {
-//         kind: TernaryTreeKind.ternaryTreeBranch,
-//         size: tree.size - 1,
-//         depth: decideParentDepth(tree.left, changedBranch, tree.right),
-//         left: tree.left,
-//         middle: changedBranch,
-//         right: tree.right,
-//       };
-//     }
-//   } else {
-//     let changedBranch = dissocList(tree.right, idx - leftSize - middleSize);
-//     if (changedBranch == null || changedBranch.size === 0) {
-//       changedBranch = emptyBranch;
-//     }
-//     result = {
-//       kind: TernaryTreeKind.ternaryTreeBranch,
-//       size: tree.size - 1,
-//       depth: decideParentDepth(tree.left, tree.middle, changedBranch),
-//       left: tree.left,
-//       middle: tree.middle,
-//       right: changedBranch,
-//     };
-//   }
-//   if (result.middle == null) {
-//     return result.left;
-//   }
-//   return result;
-// }
-
-// pub fn rest(&self) -> TernaryTreeList<T> {
-//   if (tree == null) {
-//     throw new Error("Cannot call rest on null");
-//   }
-//   if (listLen(tree) < 1) {
-//     throw new Error("Cannot call rest on empty list");
-//   }
-
-//   return dissocList(tree, 0);
-// }
-
-// pub fn butlast(&self) -> TernaryTreeList<T> {
-//   if (tree == null) {
-//     throw new Error("Cannot call butlast on null");
-//   }
-//   if (listLen(tree) < 1) {
-//     throw new Error("Cannot call butlast on empty list");
-//   }
-
-//   return dissocList(tree, listLen(tree) - 1);
-// }
-
-// pub fn insert(&self, idx: number, item: T, after: bool = false): TernaryTreeList<T> {
-//   if (tree == null) {
-//     throw new Error("Cannot insert into null");
-//   }
-//   if (listLen(tree) === 0) {
-//     throw new Error("Empty node is not a correct position for inserting");
-//   }
-
-//   if (tree.kind === TernaryTreeKind.ternaryTreeLeaf) {
-//     if (after) {
-//       let result: TernaryTreeList<T> = {
-//         kind: TernaryTreeKind.ternaryTreeBranch,
-//         depth: getDepth(tree) + 1,
-//         size: 2,
-//         left: tree,
-//         middle: { kind: TernaryTreeKind.ternaryTreeLeaf, size: 1, value: item } as TernaryTreeList<T>,
-//         right: emptyBranch,
-//       };
-//       return result;
-//     } else {
-//       let result: TernaryTreeList<T> = {
-//         kind: TernaryTreeKind.ternaryTreeBranch,
-//         depth: getDepth(tree) + 1,
-//         size: 2,
-//         left: { kind: TernaryTreeKind.ternaryTreeLeaf, size: 1, value: item } as TernaryTreeList<T>,
-//         middle: tree,
-//         right: emptyBranch,
-//       };
-//       return result;
-//     }
-//   }
-
-//   if (listLen(tree) === 1) {
-//     if (after) {
-//       // in compact mode, values placed at left
-//       let result: TernaryTreeList<T> = {
-//         kind: TernaryTreeKind.ternaryTreeBranch,
-//         size: 2,
-//         depth: 2,
-//         left: tree.left,
-//         middle: { kind: TernaryTreeKind.ternaryTreeLeaf, size: 1, value: item } as TernaryTreeList<T>,
-//         right: emptyBranch,
-//       };
-//       return result;
-//     } else {
-//       let result: TernaryTreeList<T> = {
-//         kind: TernaryTreeKind.ternaryTreeBranch,
-//         size: 2,
-//         depth: getDepth(tree.middle) + 1,
-//         left: { kind: TernaryTreeKind.ternaryTreeLeaf, size: 1, value: item } as TernaryTreeList<T>,
-//         middle: tree.left,
-//         right: emptyBranch,
-//       };
-//       return result;
-//     }
-//   }
-
-//   if (listLen(tree) === 2 && tree.middle != null) {
-//     if (after) {
-//       if (idx === 0) {
-//         let result: TernaryTreeList<T> = {
-//           kind: TernaryTreeKind.ternaryTreeBranch,
-//           size: 3,
-//           depth: 2,
-//           left: tree.left,
-//           middle: { kind: TernaryTreeKind.ternaryTreeLeaf, size: 1, value: item } as TernaryTreeList<T>,
-//           right: tree.middle,
-//         };
-//         return result;
-//       }
-//       if (idx === 1) {
-//         let result: TernaryTreeList<T> = {
-//           kind: TernaryTreeKind.ternaryTreeBranch,
-//           size: 3,
-//           depth: 2,
-//           left: tree.left,
-//           middle: tree.middle,
-//           right: { kind: TernaryTreeKind.ternaryTreeLeaf, size: 1, value: item } as TernaryTreeList<T>,
-//         };
-//         return result;
-//       } else {
-//         throw new Error("cannot insert after position 2 since only 2 elements here");
-//       }
-//     } else {
-//       if (idx === 0) {
-//         let result: TernaryTreeList<T> = {
-//           kind: TernaryTreeKind.ternaryTreeBranch,
-//           size: 3,
-//           depth: 2,
-//           left: { kind: TernaryTreeKind.ternaryTreeLeaf, size: 1, value: item } as TernaryTreeList<T>,
-//           middle: tree.left,
-//           right: tree.middle,
-//         };
-//         return result;
-//       } else if (idx === 1) {
-//         let result: TernaryTreeList<T> = {
-//           kind: TernaryTreeKind.ternaryTreeBranch,
-//           size: 3,
-//           depth: 2,
-//           left: tree.left,
-//           middle: { kind: TernaryTreeKind.ternaryTreeLeaf, size: 1, value: item } as TernaryTreeList<T>,
-//           right: tree.middle,
-//         };
-//         return result;
-//       } else {
-//         throw new Error("cannot insert before position 2 since only 2 elements here");
-//       }
-//     }
-//   }
-
-//   let leftSize = listLen(tree.left);
-//   let middleSize = listLen(tree.middle);
-//   let rightSize = listLen(tree.right);
-
-//   if (leftSize + middleSize + rightSize !== tree.size) {
-//     throw new Error("tree.size does not match sum case branch sizes");
-//   }
-
-//   // echo "picking: ", idx, " ", leftSize, " ", middleSize, " ", rightSize
-
-//   if (idx === 0 && !after) {
-//     if (listLen(tree.left) >= listLen(tree.middle) && listLen(tree.left) >= listLen(tree.right)) {
-//       let result: TernaryTreeList<T> = {
-//         kind: TernaryTreeKind.ternaryTreeBranch,
-//         size: tree.size + 1,
-//         depth: tree.depth + 1,
-//         left: { kind: TernaryTreeKind.ternaryTreeLeaf, size: 1, value: item } as TernaryTreeList<T>,
-//         middle: tree,
-//         right: emptyBranch,
-//       };
-//       return result;
-//     }
-//   }
-
-//   if (idx === listLen(tree) - 1 && after) {
-//     if (listLen(tree.right) >= listLen(tree.middle) && listLen(tree.right) >= listLen(tree.left)) {
-//       let result: TernaryTreeList<T> = {
-//         kind: TernaryTreeKind.ternaryTreeBranch,
-//         size: tree.size + 1,
-//         depth: tree.depth + 1,
-//         left: tree,
-//         middle: { kind: TernaryTreeKind.ternaryTreeLeaf, size: 1, value: item } as TernaryTreeList<T>,
-//         right: emptyBranch,
-//       };
-//       return result;
-//     }
-//   }
-
-//   if (after && idx === listLen(tree) - 1 && rightSize === 0 && middleSize >= leftSize) {
-//     let result: TernaryTreeList<T> = {
-//       kind: TernaryTreeKind.ternaryTreeBranch,
-//       size: tree.size + 1,
-//       depth: tree.depth,
-//       left: tree.left,
-//       middle: tree.middle,
-//       right: { kind: TernaryTreeKind.ternaryTreeLeaf, size: 1, value: item } as TernaryTreeList<T>,
-//     };
-//     return result;
-//   }
-
-//   if (!after && idx === 0 && rightSize === 0 && middleSize >= rightSize) {
-//     let result: TernaryTreeList<T> = {
-//       kind: TernaryTreeKind.ternaryTreeBranch,
-//       size: tree.size + 1,
-//       depth: tree.depth,
-//       left: { kind: TernaryTreeKind.ternaryTreeLeaf, size: 1, value: item } as TernaryTreeList<T>,
-//       middle: tree.left,
-//       right: tree.middle,
-//     };
-//     return result;
-//   }
-
-//   if (idx <= leftSize - 1) {
-//     let changedBranch = insert(tree.left, idx, item, after);
-
-//     let result: TernaryTreeList<T> = {
-//       kind: TernaryTreeKind.ternaryTreeBranch,
-//       size: tree.size + 1,
-//       depth: decideParentDepth(changedBranch, tree.middle, tree.right),
-//       left: changedBranch,
-//       middle: tree.middle,
-//       right: tree.right,
-//     };
-//     return result;
-//   } else if (idx <= leftSize + middleSize - 1) {
-//     let changedBranch = insert(tree.middle, idx - leftSize, item, after);
-
-//     let result: TernaryTreeList<T> = {
-//       kind: TernaryTreeKind.ternaryTreeBranch,
-//       size: tree.size + 1,
-//       depth: decideParentDepth(tree.left, changedBranch, tree.right),
-//       left: tree.left,
-//       middle: changedBranch,
-//       right: tree.right,
-//     };
-
-//     return result;
-//   } else {
-//     let changedBranch = insert(tree.right, idx - leftSize - middleSize, item, after);
-
-//     let result: TernaryTreeList<T> = {
-//       kind: TernaryTreeKind.ternaryTreeBranch,
-//       size: tree.size + 1,
-//       depth: decideParentDepth(tree.left, tree.middle, changedBranch),
-//       left: tree.left,
-//       middle: tree.middle,
-//       right: changedBranch,
-//     };
-//     return result;
-//   }
-// }
-
-// pub fn assocBefore(&self, idx: number, item: T, after: bool = false): TernaryTreeList<T> {
-//   return insert(tree, idx, item, false);
-// }
-
-// pub fn assocAfter(&self, idx: number, item: T, after: bool = false): TernaryTreeList<T> {
-//   return insert(tree, idx, item, true);
-// }
-
-// // this function mutates original tree to make it more balanced
-// pub fn forceListInplaceBalancing(&self) -> void {
-//   if (tree.kind === TernaryTreeKind.ternaryTreeBranch) {
-//     // echo "Force inplace balancing case list: ", tree.size
-//     let ys = toLeavesArray(tree);
-//     let newTree = makeTernaryTreeList(ys.length, 0, ys) as TernaryTreeListTheBranch<T>;
-//     // let newTree = initTernaryTreeList(ys)
-//     tree.left = newTree.left;
-//     tree.middle = newTree.middle;
-//     tree.right = newTree.right;
-//     tree.depth = decideParentDepth(tree.left, tree.middle, tree.right);
-//   } else {
-//     //
-//   }
-// }
-
-// // TODO, need better strategy for detecting
-// function maybeReblance(&self) -> void {
-//   let currentDepth = getDepth(tree);
-//   if (currentDepth > 50) {
-//     if (roughIntPow(3, currentDepth - 50) > tree.size) {
-//       forceListInplaceBalancing(tree);
-//     }
-//   }
-// }
-
-// pub fn prepend(&self, item: T, disableBalancing: bool = false): TernaryTreeList<T> {
-//   if (tree == null || listLen(tree) === 0) {
-//     return { kind: TernaryTreeKind.ternaryTreeLeaf, size: 1, value: item } as TernaryTreeList<T>;
-//   }
-//   let result = insert(tree, 0, item, false);
-
-//   if (!disableBalancing) {
-//     maybeReblance(result);
-//   }
-//   return result;
-// }
-
-// pub fn append(&self, item: T, disableBalancing: bool = false): TernaryTreeList<T> {
-//   if (tree == null || listLen(tree) === 0) {
-//     return { kind: TernaryTreeKind.ternaryTreeLeaf, size: 1, value: item } as TernaryTreeList<T>;
-//   }
-//   let result = insert(tree, listLen(tree) - 1, item, true);
-
-//   if (!disableBalancing) {
-//     maybeReblance(result);
-//   }
-//   return result;
-// }
-
-// pub fn concat<T>(...xsGroups: Array<TernaryTreeList<T>>): TernaryTreeList<T> {
-//   xsGroups = xsGroups.filter((xs) => listLen(xs) > 0);
-//   let result = makeTernaryTreeList(xsGroups.length, 0, xsGroups);
-//   maybeReblance(result);
-//   return result;
-// }
-
-// pub fn listEqual<T>(xs: TernaryTreeList<T>, ys: TernaryTreeList<T>) -> bool {
-//   if (xs === ys) {
-//     return true;
-//   }
-//   if (listLen(xs) !== listLen(ys)) {
-//     return false;
-//   }
-
-//   for (let idx = 0; idx < listLen(xs); idx++) {
-//     if (!dataEqual(listGet(xs, idx), listGet(ys, idx))) {
-//       return false;
-//     }
-//   }
-
-//   return true;
-// }
-
-// pub fn checkListStructure(&self) -> bool {
-//   if (tree == null) {
-//     return true;
-//   } else {
-//     match (tree.kind) {
-//       case TernaryTreeKind.ternaryTreeLeaf:
-//         if (tree.size !== 1) {
-//           throw new Error(`Bad size at node ${formatListInline(tree)}`);
-//         }
-//         break;
-//       case TernaryTreeKind.ternaryTreeBranch: {
-//         if (tree.size !== listLen(tree.left) + listLen(tree.middle) + listLen(tree.right)) {
-//           throw new Error(`Bad size at branch ${formatListInline(tree)}`);
-//         }
-
-//         if (tree.depth !== decideParentDepth(tree.left, tree.middle, tree.right)) {
-//           let x = decideParentDepth(tree.left, tree.middle, tree.right);
-//           throw new Error(`Bad depth at branch ${formatListInline(tree)}`);
-//         }
-
-//         checkListStructure(tree.left);
-//         checkListStructure(tree.middle);
-//         checkListStructure(tree.right);
-//         break;
-//       }
-//     }
-
-//     return true;
-//   }
-// }
-
-// // excludes value at endIdx, kept aligned with JS & Clojure
-// pub fn slice(&self, startIdx: number, endIdx: number): TernaryTreeList<T> {
-//   // echo "slice {tree.formatListInline}: {startIdx}..{endIdx}"
-//   if (endIdx > listLen(tree)) {
-//     throw new Error("Slice range too large {endIdx} for {tree}");
-//   }
-//   if (startIdx < 0) {
-//     throw new Error("Slice range too small {startIdx} for {tree}");
-//   }
-//   if (startIdx > endIdx) {
-//     throw new Error("Invalid slice range {startIdx}..{endIdx} for {tree}");
-//   }
-//   if (startIdx === endIdx) {
-//     return { kind: TernaryTreeKind.ternaryTreeBranch, size: 0, depth: 0 } as TernaryTreeList<T>;
-//   }
-
-//   if (tree.kind === TernaryTreeKind.ternaryTreeLeaf)
-//     if (startIdx === 0 && endIdx === 1) {
-//       return tree;
-//     } else {
-//       throw new Error(`Invalid slice range for a leaf: ${startIdx} ${endIdx}`);
-//     }
-
-//   if (startIdx === 0 && endIdx === listLen(tree)) {
-//     return tree;
-//   }
-
-//   let leftSize = listLen(tree.left);
-//   let middleSize = listLen(tree.middle);
-//   let rightSize = listLen(tree.right);
-
-//   // echo "sizes: {leftSize} {middleSize} {rightSize}"
-
-//   if (startIdx >= leftSize + middleSize) {
-//     return slice(tree.right, startIdx - leftSize - middleSize, endIdx - leftSize - middleSize);
-//   }
-//   if (startIdx >= leftSize)
-//     if (endIdx <= leftSize + middleSize) {
-//       return slice(tree.middle, startIdx - leftSize, endIdx - leftSize);
-//     } else {
-//       let middleCut = slice(tree.middle, startIdx - leftSize, middleSize);
-//       let rightCut = slice(tree.right, 0, endIdx - leftSize - middleSize);
-//       return concat(middleCut, rightCut);
-//     }
-
-//   if (endIdx <= leftSize) {
-//     return slice(tree.left, startIdx, endIdx);
-//   }
-
-//   if (endIdx <= leftSize + middleSize) {
-//     let leftCut = slice(tree.left, startIdx, leftSize);
-//     let middleCut = slice(tree.middle, 0, endIdx - leftSize);
-//     return concat(leftCut, middleCut);
-//   }
-
-//   if (endIdx <= leftSize + middleSize + rightSize) {
-//     let leftCut = slice(tree.left, startIdx, leftSize);
-//     let rightCut = slice(tree.right, 0, endIdx - leftSize - middleSize);
-//     return concat(concat(leftCut, tree.middle), rightCut);
-//   }
-//   throw new Error("Unknown");
-// }
-
-// pub fn reverse(&self) -> TernaryTreeList<T> {
-//   if (tree == null) {
-//     return tree;
-//   }
-
-//   match (tree.kind) {
-//     case TernaryTreeKind.ternaryTreeLeaf:
-//       return tree;
-//     case TernaryTreeKind.ternaryTreeBranch: {
-//       let result: TernaryTreeList<T> = {
-//         kind: TernaryTreeKind.ternaryTreeBranch,
-//         size: tree.size,
-//         depth: tree.depth,
-//         left: reverse(tree.right),
-//         middle: reverse(tree.middle),
-//         right: reverse(tree.left),
-//       };
-//       return result;
-//     }
-//   }
-// }
-
-// pub fn listMapValues<T, V>(&self, f: (x: T) => V): TernaryTreeList<V> {
-//   if (tree == null) {
-//     return tree;
-//   }
-
-//   match (tree.kind) {
-//     case TernaryTreeKind.ternaryTreeLeaf: {
-//       let result: TernaryTreeList<V> = {
-//         kind: TernaryTreeKind.ternaryTreeLeaf,
-//         size: tree.size,
-//         value: f(tree.value),
-//       };
-//       return result;
-//     }
-//     case TernaryTreeKind.ternaryTreeBranch: {
-//       let result: TernaryTreeList<V> = {
-//         kind: TernaryTreeKind.ternaryTreeBranch,
-//         size: tree.size,
-//         depth: tree.depth,
-//         left: tree.left == null ? emptyBranch : listMapValues(tree.left, f),
-//         middle: tree.middle == null ? emptyBranch : listMapValues(tree.middle, f),
-//         right: tree.right == null ? emptyBranch : listMapValues(tree.right, f),
-//       };
-//       return result;
-//     }
-//   }
-// }
 
 // pass several children here
 fn decide_parent_depth<T: Clone + fmt::Display + Eq + PartialEq>(
@@ -1038,6 +1237,26 @@ fn decide_parent_depth<T: Clone + fmt::Display + Eq + PartialEq>(
     let y = x.get_depth();
     if y > depth {
       depth = y;
+    }
+  }
+
+  depth + 1
+}
+
+// pass several children here
+fn decide_parent_depth_op<T: Clone + fmt::Display + Eq + PartialEq>(
+  xs: &[&Option<Arc<TernaryTreeList<T>>>],
+) -> usize {
+  let mut depth = 0;
+  for x in xs {
+    match x {
+      Some(x2) => {
+        let y = x2.get_depth();
+        if y > depth {
+          depth = y;
+        }
+      }
+      None => {}
     }
   }
 
@@ -1059,6 +1278,33 @@ impl<T: Clone + fmt::Display + Eq + PartialEq> Iterator for TernaryTreeIntoItera
   type Item = T;
   fn next(&mut self) -> Option<Self::Item> {
     self.value.get(self.index)
+  }
+}
+
+impl<T: Clone + fmt::Display + Eq + PartialEq> PartialEq for TernaryTreeList<T> {
+  fn eq(&self, ys: &Self) -> bool {
+    if self.len() != ys.len() {
+      return false;
+    }
+
+    for idx in 0..ys.len() {
+      if self.unsafe_get(idx) != ys.unsafe_get(idx) {
+        return false;
+      }
+    }
+
+    true
+  }
+}
+impl<T: Clone + fmt::Display + Eq + PartialEq> Eq for TernaryTreeList<T> {}
+
+fn make_empty_node<T>() -> TernaryTreeList<T> {
+  Branch {
+    size: 0,
+    depth: 1,
+    left: None,
+    middle: None,
+    right: None,
   }
 }
 
