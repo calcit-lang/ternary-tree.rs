@@ -4,12 +4,12 @@ use ternary_tree::TernaryTreeList;
 #[test]
 fn init_list() -> Result<(), String> {
   assert_eq!(
-    TernaryTreeList::init_from(&[1, 2, 3, 4]).to_string(),
+    TernaryTreeList::from(&[1, 2, 3, 4]).to_string(),
     String::from("TernaryTreeList[4, ...]")
   );
 
   let origin11 = vec![1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11];
-  let data11 = TernaryTreeList::init_from(&origin11);
+  let data11 = TernaryTreeList::from(&origin11);
 
   data11.check_structure()?;
 
@@ -24,10 +24,7 @@ fn init_list() -> Result<(), String> {
   // assert_eq!(arrayEqual<number>([...listToItems(data11)], [...indexToItems(data11)]));
 
   let empty_xs: Vec<usize> = vec![];
-  assert_eq!(
-    TernaryTreeList::init_empty(),
-    TernaryTreeList::init_from(&empty_xs)
-  );
+  assert_eq!(TernaryTreeList::Empty, TernaryTreeList::from(&empty_xs));
 
   Ok(())
 }
@@ -35,7 +32,7 @@ fn init_list() -> Result<(), String> {
 #[test]
 fn list_operations() -> Result<(), String> {
   let origin11 = vec![1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11];
-  let data11 = TernaryTreeList::init_from(&origin11);
+  let data11 = TernaryTreeList::from(&origin11);
 
   // get
   for (idx, v) in origin11.iter().enumerate() {
@@ -47,7 +44,7 @@ fn list_operations() -> Result<(), String> {
 
   // assoc
   let origin5 = vec![1, 2, 3, 4, 5];
-  let data5 = TernaryTreeList::init_from(&origin5);
+  let data5 = TernaryTreeList::from(&origin5);
   let updated = data5.assoc(3, 10);
   assert_eq!(updated.unsafe_get(3), 10);
   assert_eq!(data5.unsafe_get(3), 4);
@@ -65,54 +62,40 @@ fn list_operations() -> Result<(), String> {
   assert_eq!(data5.dissoc(3).format_inline(), "((1 2 _) 3 5)");
   assert_eq!(data5.dissoc(4).format_inline(), "((1 2 _) 3 4)");
 
-  assert_eq!(TernaryTreeList::init_from(&[1]).rest().format_inline(), "_");
+  assert_eq!(TernaryTreeList::from(&[1]).rest().format_inline(), "_");
+  assert_eq!(TernaryTreeList::from(&[1, 2]).rest().format_inline(), "2");
   assert_eq!(
-    TernaryTreeList::init_from(&[1, 2]).rest().format_inline(),
-    "2"
-  );
-  assert_eq!(
-    TernaryTreeList::init_from(&[1, 2, 3])
-      .rest()
-      .format_inline(),
+    TernaryTreeList::from(&[1, 2, 3]).rest().format_inline(),
     "(2 3 _)"
   );
   assert_eq!(
-    TernaryTreeList::init_from(&[1, 2, 3, 4])
-      .rest()
-      .format_inline(),
+    TernaryTreeList::from(&[1, 2, 3, 4]).rest().format_inline(),
     "((2 3 _) 4 _)"
   );
   assert_eq!(
-    TernaryTreeList::init_from(&[1, 2, 3, 4, 5])
+    TernaryTreeList::from(&[1, 2, 3, 4, 5])
       .rest()
       .format_inline(),
     "(2 3 (4 5 _))"
   );
 
+  assert_eq!(TernaryTreeList::from(&[1]).butlast().format_inline(), "_");
   assert_eq!(
-    TernaryTreeList::init_from(&[1]).butlast().format_inline(),
-    "_"
-  );
-  assert_eq!(
-    TernaryTreeList::init_from(&[1, 2])
-      .butlast()
-      .format_inline(),
+    TernaryTreeList::from(&[1, 2]).butlast().format_inline(),
     "1"
   );
   assert_eq!(
-    TernaryTreeList::init_from(&[1, 2, 3])
-      .butlast()
-      .format_inline(),
+    TernaryTreeList::from(&[1, 2, 3]).butlast().format_inline(),
     "(1 2 _)"
   );
   assert_eq!(
-    TernaryTreeList::init_from(&[1, 2, 3, 4])
+    TernaryTreeList::from(&[1, 2, 3, 4])
       .butlast()
       .format_inline(),
     "(1 (2 3 _) _)"
   );
   assert_eq!(
-    TernaryTreeList::init_from(&[1, 2, 3, 4, 5])
+    TernaryTreeList::from(&[1, 2, 3, 4, 5])
       .butlast()
       .format_inline(),
     "((1 2 _) 3 4)"
@@ -124,7 +107,7 @@ fn list_operations() -> Result<(), String> {
 #[test]
 fn list_insertions() -> Result<(), String> {
   let origin5 = vec![1, 2, 3, 4, 5];
-  let data5 = TernaryTreeList::init_from(&origin5);
+  let data5 = TernaryTreeList::from(&origin5);
 
   assert_eq!(data5.format_inline(), "((1 2 _) 3 (4 5 _))");
 
@@ -170,7 +153,7 @@ fn list_insertions() -> Result<(), String> {
   );
 
   let origin4 = [1, 2, 3, 4];
-  let data4 = TernaryTreeList::init_from(&origin4);
+  let data4 = TernaryTreeList::from(&origin4);
 
   assert_eq!(
     data4.assoc_before(3, 10).format_inline(),
@@ -195,18 +178,18 @@ fn list_insertions() -> Result<(), String> {
 
 #[test]
 fn test_concat() -> Result<(), String> {
-  let data1 = TernaryTreeList::init_from(&[1, 2]);
-  let data2 = TernaryTreeList::init_from(&[3, 4]);
+  let data1 = TernaryTreeList::from(&[1, 2]);
+  let data2 = TernaryTreeList::from(&[3, 4]);
 
-  let data3 = TernaryTreeList::init_from(&[5, 6]);
-  let data4 = TernaryTreeList::init_from(&[7, 8]);
+  let data3 = TernaryTreeList::from(&[5, 6]);
+  let data4 = TernaryTreeList::from(&[7, 8]);
 
   assert_eq!(
     TernaryTreeList::concat(&[data1.to_owned(), data2.to_owned()]).format_inline(),
     "((1 2 _) (3 4 _) _)"
   );
   assert_eq!(
-    TernaryTreeList::concat(&[TernaryTreeList::init_from(&[]), data1.to_owned()]).format_inline(),
+    TernaryTreeList::concat(&[TernaryTreeList::from(&[]), data1.to_owned()]).format_inline(),
     "(1 2 _)"
   );
   assert_eq!(
@@ -247,13 +230,13 @@ fn test_concat() -> Result<(), String> {
 #[test]
 fn check_equality() -> Result<(), String> {
   let origin4 = [1, 2, 3, 4];
-  let data4 = TernaryTreeList::init_from(&origin4);
-  let data4n = TernaryTreeList::init_from(&origin4);
-  let data4_made = TernaryTreeList::init_from(&[2, 3, 4]).prepend(1, false);
+  let data4 = TernaryTreeList::from(&origin4);
+  let data4n = TernaryTreeList::from(&origin4);
+  let data4_made = TernaryTreeList::from(&[2, 3, 4]).prepend(1, false);
 
-  assert!(data4.same_shape(&data4));
-  assert!(data4.same_shape(&data4n));
-  assert!(!data4.same_shape(&data4_made));
+  assert!(data4.is_shape_same(&data4));
+  assert!(data4.is_shape_same(&data4n));
+  assert!(!data4.is_shape_same(&data4_made));
 
   assert!(data4 == data4n);
   assert!(data4 == data4_made);
@@ -265,7 +248,7 @@ fn check_equality() -> Result<(), String> {
 
 #[test]
 fn force_balancing() -> Result<(), String> {
-  let mut data = TernaryTreeList::<usize>::init_from(&[]);
+  let mut data = TernaryTreeList::<usize>::from(&[]);
   for idx in 0..20 {
     data = data.append(idx, true);
   }
@@ -287,7 +270,7 @@ fn force_balancing() -> Result<(), String> {
 #[test]
 fn iterator() -> Result<(), String> {
   let origin4 = vec![1, 2, 3, 4];
-  let data4 = TernaryTreeList::init_from(&origin4);
+  let data4 = TernaryTreeList::from(&origin4);
 
   let mut i = 0;
   for _ in data4.to_owned() {
@@ -308,7 +291,7 @@ fn iterator() -> Result<(), String> {
 
 #[test]
 fn check_structure() -> Result<(), String> {
-  let mut data = TernaryTreeList::init_from(&[]);
+  let mut data = TernaryTreeList::from(&[]);
   for idx in 0..20 {
     data = data.append(idx, true);
   }
@@ -316,7 +299,7 @@ fn check_structure() -> Result<(), String> {
   data.check_structure()?;
 
   let origin11 = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11];
-  let data11 = TernaryTreeList::init_from(&origin11);
+  let data11 = TernaryTreeList::from(&origin11);
 
   data11.check_structure()?;
 
@@ -325,7 +308,7 @@ fn check_structure() -> Result<(), String> {
 
 #[test]
 fn slices() -> Result<(), String> {
-  let mut data = TernaryTreeList::init_from(&[]);
+  let mut data = TernaryTreeList::from(&[]);
   for idx in 0..40 {
     data = data.append(idx, true);
   }
@@ -345,7 +328,7 @@ fn slices() -> Result<(), String> {
 
 #[test]
 fn reverse() -> Result<(), String> {
-  let data = TernaryTreeList::init_from(&[1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
+  let data = TernaryTreeList::from(&[1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
   let reversed_data = data.reverse();
   let mut d2 = data.to_vec();
   d2.reverse();
@@ -358,7 +341,7 @@ fn reverse() -> Result<(), String> {
 #[test]
 fn list_traverse() -> Result<(), String> {
   let mut i = 0;
-  let data = TernaryTreeList::init_from(&[1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
+  let data = TernaryTreeList::from(&[1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
   for _ in data {
     i += 1;
   }
@@ -370,7 +353,7 @@ fn list_traverse() -> Result<(), String> {
 
 #[test]
 fn index_of() -> Result<(), String> {
-  let data = TernaryTreeList::init_from(&[1, 2, 3, 4, 5, 6, 7, 8]);
+  let data = TernaryTreeList::from(&[1, 2, 3, 4, 5, 6, 7, 8]);
   assert_eq!(data.index_of(&2), 1);
   assert_eq!(data.find_index(Arc::new(|x| -> bool { x == &2 })), 1);
   assert_eq!(data.index_of(&9), -1);
@@ -381,8 +364,8 @@ fn index_of() -> Result<(), String> {
 
 #[test]
 fn map_values() -> Result<(), String> {
-  let data = TernaryTreeList::init_from(&[1, 2, 3, 4]);
-  let data2 = TernaryTreeList::init_from(&[1, 4, 9, 16]);
+  let data = TernaryTreeList::from(&[1, 2, 3, 4]);
+  let data2 = TernaryTreeList::from(&[1, 4, 9, 16]);
   let data3 = data.map(Arc::new(|x| x * x));
 
   data3.check_structure()?;
