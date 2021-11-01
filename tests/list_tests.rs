@@ -1,5 +1,5 @@
+use im_ternary_tree::TernaryTreeList;
 use std::sync::Arc;
-use ternary_tree::TernaryTreeList;
 
 #[test]
 fn init_list() -> Result<(), String> {

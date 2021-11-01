@@ -7,7 +7,7 @@
 _TODO_
 
 ```rust
-use ternary_tree::TernaryTreeList;
+use im_ternary_tree::TernaryTreeList;
 
 println!("{}", TernaryTreeList::<usize>::init_from(&[]));
 

@@ -1,7 +1,16 @@
 [package]
-name = "ternary_tree"
-version = "0.0.1"
+name = "im_ternary_tree"
+version = "0.0.1-a1"
 edition = "2021"
+authors = ["jiyinyiyong <jiyinyiyong@gmail.com>"]
+license = "MIT"
+description = "Structural sharing ternary tree, i.e. immutable data structure"
+homepage = "https://github.com/calcit-lang/ternary-tree.rs/"
+documentation = "https://docs.rs/crate/ternary_tree/"
+repository = "https://github.com/calcit-lang/ternary-tree.rs/"
+readme = "README.md"
+keywords = ["ternary", "tree", "structual-sharing", "immutable"]
+
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 

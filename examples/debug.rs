@@ -1,4 +1,4 @@
-use ternary_tree::TernaryTreeList;
+use im_ternary_tree::TernaryTreeList;
 
 pub fn main() -> Result<(), String> {
   println!("{}", TernaryTreeList::<usize>::from(&[]));
