@@ -1,3 +1,17 @@
+//! ternary tree with structural sharing.
+//! a bit like 2-3 finger tree, however this library does not handle balancing well.
+//! meanwhile, it is also an interesting library displaying with triples:
+//!
+//! ```text
+//! (((0 1 2) (3 4 5) (6 7 8)) ((9 10 11) (12 13 14) (15 16 17)) (18 19 _))
+//! ```
+//!
+//! or with more holes:
+//!
+//! ```text
+//! (((0 1 _) (2 3 4) (5 6 _)) ((7 8 _) (9 10 _) (11 12 _)) ((13 14 _) (15 16 17) (18 19 _)))
+//! ```
+
 mod util;
 
 use std::cell::RefCell;
@@ -6,74 +20,66 @@ use std::sync::Arc;
 
 use util::{divide_ternary_sizes, rough_int_pow};
 
-#[derive(Clone)]
+#[derive(Clone, fmt::Debug)]
 pub enum TernaryTreeList<T> {
   Branch {
     size: usize,
+    /// TODO currently depth is inconsistent
     depth: usize,
-    left: Option<Arc<TernaryTreeList<T>>>,
-    middle: Option<Arc<TernaryTreeList<T>>>,
-    right: Option<Arc<TernaryTreeList<T>>>,
+    left: Arc<TernaryTreeList<T>>,
+    middle: Arc<TernaryTreeList<T>>,
+    right: Arc<TernaryTreeList<T>>,
   },
-  Leaf {
-    value: T,
-    size: usize,
-  },
+  Leaf(T),
+  Empty,
 }
-
-// RefInt = {
-//  value: number;
-// };
 
 use TernaryTreeList::*;
 
-impl<T: Clone + fmt::Display + Eq + PartialEq> TernaryTreeList<T> {
+impl<T: Clone + fmt::Display + Eq + PartialEq + fmt::Debug> TernaryTreeList<T> {
   /// just get, will not compute recursively
   pub fn get_depth(&self) -> usize {
     match self {
-      Branch { depth, .. } => depth.to_owned(),
+      Empty => 0,
       Leaf { .. } => 1,
+      Branch { depth, .. } => depth.to_owned(),
     }
   }
 
   pub fn is_empty(&self) -> bool {
     match self {
+      Empty => true,
+      Leaf { .. } => false,
       Branch {
         left,
         middle,
         right,
         ..
-      } => left.is_none() && middle.is_none() && right.is_none(),
-      Leaf { .. } => false,
+      } => left.is_empty() && middle.is_empty() && right.is_empty(), // TODO might be special structures
     }
   }
 
   pub fn len(&self) -> usize {
     match self {
+      Empty => 0,
+      Leaf { .. } => 1,
       Branch { size, .. } => size.to_owned(),
-      Leaf { size, .. } => size.to_owned(),
     }
   }
 
-  // make list again
-  pub fn make_list(size: usize, offset: usize, xs: &[TernaryTreeList<T>]) -> Self {
+  // make list again from existed
+  fn rebuild_list(size: usize, offset: usize, xs: &[TernaryTreeList<T>]) -> Self {
     match size {
-      0 => Branch {
-        size: 0,
-        depth: 1,
-        left: None,
-        middle: None,
-        right: None,
-      },
+      0 => Empty,
       1 => xs[offset].to_owned(),
       2 => {
         let left = &xs[offset];
         let middle = &xs[offset + 1];
         Branch {
           size: left.len() + middle.len(),
-          left: Some(Arc::new(left.to_owned())),
-          middle: Some(Arc::new(middle.to_owned())),
-          right: None,
+          left: Arc::new(left.to_owned()),
+          middle: Arc::new(middle.to_owned()),
+          right: Arc::new(Empty),
           depth: decide_parent_depth(&[left, middle]),
         }
       }
@@ -83,49 +89,37 @@ impl<T: Clone + fmt::Display + Eq + PartialEq> TernaryTreeList<T> {
         let right = &xs[offset + 2];
         Branch {
           size: left.len() + middle.len() + right.len(),
-          left: Some(Arc::new(left.to_owned())),
-          middle: Some(Arc::new(middle.to_owned())),
-          right: Some(Arc::new(right.to_owned())),
+          left: Arc::new(left.to_owned()),
+          middle: Arc::new(middle.to_owned()),
+          right: Arc::new(right.to_owned()),
           depth: decide_parent_depth(&[left, middle, right]),
         }
       }
       _ => {
         let divided = divide_ternary_sizes(size);
 
-        let left = Self::make_list(divided.0, offset, xs);
-        let middle = Self::make_list(divided.1, offset + divided.0, xs);
-        let right = Self::make_list(divided.2, offset + divided.0 + divided.1, xs);
+        let left = Self::rebuild_list(divided.0, offset, xs);
+        let middle = Self::rebuild_list(divided.1, offset + divided.0, xs);
+        let right = Self::rebuild_list(divided.2, offset + divided.0 + divided.1, xs);
         Branch {
           size: left.len() + middle.len() + right.len(),
           depth: decide_parent_depth(&[&left, &middle, &right]),
-          left: Some(Arc::new(left)),
-          middle: Some(Arc::new(middle)),
-          right: Some(Arc::new(right)),
+          left: Arc::new(left),
+          middle: Arc::new(middle),
+          right: Arc::new(right),
         }
       }
     }
   }
-  pub fn init_from(xs: &[T]) -> Self {
+  pub fn from(xs: &[T]) -> Self {
     let mut ys: Vec<Self> = Vec::with_capacity(xs.len());
     for x in xs {
-      ys.push(Leaf {
-        size: 1,
-        value: x.to_owned(),
-      })
+      ys.push(Leaf(x.to_owned()))
     }
 
-    Self::make_list(xs.len(), 0, &ys)
+    Self::rebuild_list(xs.len(), 0, &ys)
   }
 
-  pub fn init_empty() -> Self {
-    Branch {
-      size: 0,
-      depth: 1,
-      middle: None,
-      left: None,
-      right: None,
-    }
-  }
   pub fn is_leaf(self) -> bool {
     matches!(self, Leaf { .. })
   }
@@ -134,29 +128,24 @@ impl<T: Clone + fmt::Display + Eq + PartialEq> TernaryTreeList<T> {
     matches!(self, Branch { .. })
   }
 
+  /// turn into a compare representation, with `_` for holes
   pub fn format_inline(&self) -> String {
     match self {
-      Leaf { value, .. } => value.to_string(),
+      Empty => String::from("_"),
+      Leaf(value) => value.to_string(),
       Branch {
         left,
         middle,
         right,
         ..
       } => {
-        let left_text = match left {
-          Some(x) => x.format_inline(),
-          None => "_".to_owned(), // TODO actually inline more
-        };
-        let middle_text = match middle {
-          Some(x) => x.format_inline(),
-          None => "_".to_owned(),
-        };
-        let right_text = match right {
-          Some(x) => x.format_inline(),
-          None => "_".to_owned(),
-        };
         // TODO maybe need more informations here
-        format!("({} {} {}", left_text, middle_text, right_text)
+        format!(
+          "({} {} {})",
+          left.format_inline(),
+          middle.format_inline(),
+          right.format_inline()
+        )
       }
     }
   }
@@ -171,11 +160,9 @@ impl<T: Clone + fmt::Display + Eq + PartialEq> TernaryTreeList<T> {
 
   // returns -1 if (not foun)
   pub fn find_index(&self, f: Arc<dyn Fn(&T) -> bool>) -> i64 {
-    if self.is_empty() {
-      return -1;
-    }
     match self {
-      Leaf { value, .. } => {
+      Empty => -1,
+      Leaf(value) => {
         if f(value) {
           0
         } else {
@@ -189,27 +176,19 @@ impl<T: Clone + fmt::Display + Eq + PartialEq> TernaryTreeList<T> {
         right,
         ..
       } => {
-        let mut left_size = 0;
-        let mut middle_size = 0;
-        if let Some(br) = left {
-          left_size = br.len();
-          let v = br.find_index(f.clone());
-          if v >= 0 {
-            return v;
-          }
+        let v = left.find_index(f.clone());
+        if v >= 0 {
+          return v;
         }
-        if let Some(br) = middle {
-          middle_size = br.len();
-          let v = br.find_index(f.clone());
-          if v >= 0 {
-            return v + left_size as i64;
-          }
+
+        let v = middle.find_index(f.clone());
+        if v >= 0 {
+          return v + left.len() as i64;
         }
-        if let Some(br) = right {
-          let v = br.find_index(f.clone());
-          if v >= 0 {
-            return v + (left_size as i64) + (middle_size as i64);
-          }
+
+        let v = right.find_index(f.clone());
+        if v >= 0 {
+          return v + (left.len() as i64) + (middle.len() as i64);
         }
 
         -1
@@ -218,11 +197,9 @@ impl<T: Clone + fmt::Display + Eq + PartialEq> TernaryTreeList<T> {
   }
   // returns -1 if (not foun)
   pub fn index_of(&self, item: &T) -> i64 {
-    if self.is_empty() {
-      return -1;
-    }
     match self {
-      Leaf { value, .. } => {
+      Empty => -1,
+      Leaf(value) => {
         if item == value {
           0
         } else {
@@ -235,27 +212,23 @@ impl<T: Clone + fmt::Display + Eq + PartialEq> TernaryTreeList<T> {
         right,
         ..
       } => {
-        let mut left_size = 0;
-        let mut middle_size = 0;
-        if let Some(br) = left {
-          left_size = br.len();
-          let v = br.index_of(item);
+        {
+          let v = left.index_of(item);
           if v >= 0 {
             return v;
           }
         }
-        if let Some(br) = middle {
-          middle_size = br.len();
-          let v = br.index_of(item);
+        {
+          let v = middle.index_of(item);
           if v >= 0 {
-            return v + left_size as i64;
+            return v + left.len() as i64;
           }
         }
 
-        if let Some(br) = right {
-          let v = br.index_of(item);
+        {
+          let v = right.index_of(item);
           if v >= 0 {
-            return v + left_size as i64 + middle_size as i64;
+            return v + left.len() as i64 + middle.len() as i64;
           }
         }
         -1
@@ -263,8 +236,9 @@ impl<T: Clone + fmt::Display + Eq + PartialEq> TernaryTreeList<T> {
     }
   }
 
-  pub fn same_shape(xs: &Self, ys: &Self) -> bool {
-    if xs.is_empty() {
+  /// recursively check structure
+  pub fn is_shape_same(&self, ys: &Self) -> bool {
+    if self.is_empty() {
       return ys.is_empty();
     }
 
@@ -272,17 +246,16 @@ impl<T: Clone + fmt::Display + Eq + PartialEq> TernaryTreeList<T> {
       return false;
     }
 
-    if xs.len() != ys.len() {
+    if self.len() != ys.len() {
       return false;
     }
 
-    if xs.get_depth() != ys.get_depth() {
+    if self.get_depth() != ys.get_depth() {
       return false;
     }
 
-    match (xs, ys) {
-      (Leaf { value, .. }, Leaf { value: v2, .. }) => value == v2,
-
+    match (self, ys) {
+      (Leaf(value), Leaf(v2)) => value == v2,
       (
         Branch {
           left,
@@ -302,50 +275,21 @@ impl<T: Clone + fmt::Display + Eq + PartialEq> TernaryTreeList<T> {
     }
   }
 
-  fn write_leaves(&self, acc: /* var */ &mut [TernaryTreeList<T>], counter: &RefCell<usize>) {
-    if self.is_empty() {
-      return;
-    }
-
-    match self {
-      Leaf { .. } => {
-        let idx = counter.take();
-        acc[idx] = self.to_owned();
-
-        counter.replace(idx + 1);
-      }
-      Branch {
-        left,
-        middle,
-        right,
-        ..
-      } => {
-        if let Some(br) = left {
-          Self::write_leaves(br, acc, counter);
-        }
-        if let Some(br) = middle {
-          Self::write_leaves(br, acc, counter);
-        }
-        if let Some(br) = right {
-          Self::write_leaves(br, acc, counter);
-        }
-      }
-    }
-  }
-
-  pub fn to_leaves(&mut self) -> Vec<TernaryTreeList<T>> {
+  pub fn to_leaves(&self) -> Vec<TernaryTreeList<T>> {
     let mut acc: Vec<TernaryTreeList<T>> = Vec::with_capacity(self.len());
-    let counter: RefCell<usize> = RefCell::new(5);
-    Self::write_leaves(self, &mut acc, &counter);
+    let counter: RefCell<usize> = RefCell::new(0);
+    write_leaves(self, &mut acc, &counter);
+    assert_eq!(acc.len(), self.len());
     acc
   }
 
   pub fn unsafe_get(&self, original_idx: usize) -> T {
-    let mut tree_parent = Some(Arc::new((*self).to_owned()));
+    let mut tree_parent = self.to_owned();
     let mut idx = original_idx;
-    while let Some(tree) = tree_parent {
-      match &*tree {
-        Leaf { value, .. } => {
+    while tree_parent != Empty {
+      match tree_parent {
+        Empty => unreachable!("empty"),
+        Leaf(value) => {
           if idx == 0 {
             return value.to_owned();
           } else {
@@ -362,31 +306,19 @@ impl<T: Clone + fmt::Display + Eq + PartialEq> TernaryTreeList<T> {
           if idx > size - 1 {
             unreachable!("Index too large")
           }
-          let left_size = match &left {
-            Some(br) => br.len(),
-            None => 0,
-          };
-          let middle_size = match &middle {
-            Some(br) => br.len(),
-            None => 0,
-          };
-          let right_size = match &right {
-            Some(br) => br.len(),
-            None => 0,
-          };
 
-          if left_size + middle_size + right_size != *size {
+          if left.len() + middle.len() + right.len() != size {
             unreachable!("tree.size does not match sum case branch sizes");
           }
 
-          if idx < left_size {
-            tree_parent = left.to_owned();
-          } else if idx < left_size + middle_size {
-            tree_parent = middle.to_owned();
-            idx -= left_size;
+          if idx < left.len() {
+            tree_parent = (*left).to_owned();
+          } else if idx < left.len() + middle.len() {
+            tree_parent = (*middle).to_owned();
+            idx -= left.len();
           } else {
-            tree_parent = right.to_owned();
-            idx -= left_size + middle_size;
+            tree_parent = (*right).to_owned();
+            idx -= left.len() + middle.len();
           }
         }
       }
@@ -416,14 +348,14 @@ impl<T: Clone + fmt::Display + Eq + PartialEq> TernaryTreeList<T> {
     }
 
     match self {
-      Leaf { value, .. } => {
+      Empty => {
+        unreachable!("Cannot assoc into empty")
+      }
+      Leaf { .. } => {
         if idx == 0 {
-          Leaf {
-            size: 1,
-            value: value.to_owned(),
-          }
+          Leaf(item.to_owned())
         } else {
-          unreachable!("Cannot get from leaf with index ${idx}")
+          unreachable!("Cannot assoc leaf into index ${idx}")
         }
       }
       Branch {
@@ -433,72 +365,36 @@ impl<T: Clone + fmt::Display + Eq + PartialEq> TernaryTreeList<T> {
         size,
         ..
       } => {
-        let left_size = match left {
-          Some(br) => br.len(),
-          None => 0,
-        };
-        let middle_size = match middle {
-          Some(br) => br.len(),
-          None => 0,
-        };
-        let right_size = match right {
-          Some(br) => br.len(),
-          None => 0,
-        };
-
-        if left_size + middle_size + right_size != *size {
+        if left.len() + middle.len() + right.len() != *size {
           unreachable!("tree.size does not match sum case branch sizes");
         }
 
-        if idx < left_size {
-          match left {
-            Some(br) => {
-              let changed_branch = Arc::new(br.assoc(idx, item));
-              Branch {
-                size: size.to_owned(),
-                depth: decide_parent_depth_op(&[
-                  &Some(changed_branch.to_owned()),
-                  &*middle,
-                  &*right,
-                ]),
-                left: Some(changed_branch.to_owned()),
-                middle: middle.to_owned(),
-                right: right.to_owned(),
-              }
-            }
-            None => unreachable!("expected data in left branch"),
+        if idx < left.len() {
+          let changed_branch = left.assoc(idx, item);
+          Branch {
+            size: size.to_owned(),
+            depth: decide_parent_depth(&[&changed_branch, middle, right]),
+            left: Arc::new(changed_branch),
+            middle: middle.to_owned(),
+            right: right.to_owned(),
           }
-        } else if idx < left_size + middle_size {
-          match middle {
-            Some(br) => {
-              let changed_branch = Arc::new(br.assoc(idx - left_size, item));
-              Branch {
-                size: size.to_owned(),
-                depth: decide_parent_depth_op(&[&*left, &Some(changed_branch.to_owned()), &*right]),
-                left: left.to_owned(),
-                middle: Some(changed_branch.to_owned()),
-                right: right.to_owned(),
-              }
-            }
-            None => unreachable!("expected data in middle branch"),
+        } else if idx < left.len() + middle.len() {
+          let changed_branch = middle.assoc(idx - left.len(), item);
+          Branch {
+            size: size.to_owned(),
+            depth: decide_parent_depth(&[left, &changed_branch, right]),
+            left: left.to_owned(),
+            middle: Arc::new(changed_branch),
+            right: right.to_owned(),
           }
         } else {
-          match right {
-            Some(br) => {
-              let changed_branch = Arc::new(br.assoc(idx - left_size - middle_size, item));
-              Branch {
-                size: size.to_owned(),
-                depth: decide_parent_depth_op(&[
-                  &*left,
-                  &*middle,
-                  &Some(changed_branch.to_owned()),
-                ]),
-                left: left.to_owned(),
-                middle: middle.to_owned(),
-                right: Some(changed_branch.to_owned()),
-              }
-            }
-            None => unreachable!("expected data in right branch"),
+          let changed_branch = right.assoc(idx - left.len() - middle.len(), item);
+          Branch {
+            size: size.to_owned(),
+            depth: decide_parent_depth(&[left, middle, &changed_branch]),
+            left: left.to_owned(),
+            middle: middle.to_owned(),
+            right: Arc::new(changed_branch.to_owned()),
           }
         }
       }
@@ -514,16 +410,11 @@ impl<T: Clone + fmt::Display + Eq + PartialEq> TernaryTreeList<T> {
     }
 
     if self.len() == 1 {
-      return Branch {
-        size: 0,
-        depth: 1,
-        left: None,
-        middle: None,
-        right: None,
-      };
+      return Empty;
     }
 
     match self {
+      Empty => unreachable!("dissoc out of bound"),
       Leaf { .. } => unreachable!("dissoc should be handled at branches"),
       Branch {
         left,
@@ -532,94 +423,58 @@ impl<T: Clone + fmt::Display + Eq + PartialEq> TernaryTreeList<T> {
         size,
         ..
       } => {
-        let left_size = match left {
-          Some(br) => br.len(),
-          None => 0,
-        };
-        let middle_size = match middle {
-          Some(br) => br.len(),
-          None => 0,
-        };
-        let right_size = match right {
-          Some(br) => br.len(),
-          None => 0,
-        };
-
-        if left_size + middle_size + right_size != *size {
+        if left.len() + middle.len() + right.len() != *size {
           unreachable!("tree.size does not match sum from branch sizes");
         }
 
         let result: Self;
 
-        if idx < left_size {
-          match &left {
-            Some(br) => {
-              let changed_branch = br.dissoc(idx);
-              result = if changed_branch.is_empty() {
-                Branch {
-                  size: *size - 1,
-                  depth: decide_parent_depth_op(&[middle, right]),
-                  left: middle.to_owned(),
-                  middle: right.to_owned(),
-                  right: Some(Arc::new(make_empty_node())),
-                }
-              } else {
-                Branch {
-                  size: *size - 1,
-                  depth: decide_parent_depth_op(&[
-                    &Some(Arc::new(changed_branch.to_owned())),
-                    middle,
-                    right,
-                  ]),
-                  left: Some(Arc::new(changed_branch.to_owned())),
-                  middle: middle.to_owned(),
-                  right: right.to_owned(),
-                }
-              }
+        if idx < left.len() {
+          let changed_branch = left.dissoc(idx);
+          result = if changed_branch.is_empty() {
+            Branch {
+              size: *size - 1,
+              depth: decide_parent_depth(&[middle, right]),
+              left: middle.to_owned(),
+              middle: right.to_owned(),
+              right: Arc::new(make_empty_node()),
             }
-            None => unreachable!("expected data in left branch"),
+          } else {
+            Branch {
+              size: *size - 1,
+              depth: decide_parent_depth(&[&changed_branch, middle, right]),
+              left: Arc::new(changed_branch.to_owned()),
+              middle: middle.to_owned(),
+              right: right.to_owned(),
+            }
           }
-        } else if idx < left_size + middle_size {
-          match &middle {
-            Some(br) => {
-              let changed_branch = br.dissoc(idx - left_size);
-              result = if changed_branch.is_empty() {
-                Branch {
-                  size: *size - 1,
-                  depth: decide_parent_depth_op(&[left, &Some(Arc::new(changed_branch)), right]),
-                  left: left.to_owned(),
-                  middle: right.to_owned(),
-                  right: Some(Arc::new(make_empty_node())),
-                }
-              } else {
-                Branch {
-                  size: *size - 1,
-                  depth: decide_parent_depth_op(&[left, &Some(Arc::new(changed_branch)), right]),
-                  left: left.to_owned(),
-                  middle: Some(Arc::new(make_empty_node())),
-                  right: right.to_owned(),
-                }
-              }
+        } else if idx < left.len() + middle.len() {
+          let changed_branch = middle.dissoc(idx - left.len());
+          result = if changed_branch.is_empty() {
+            Branch {
+              size: *size - 1,
+              depth: decide_parent_depth(&[left, &changed_branch, right]),
+              left: left.to_owned(),
+              middle: right.to_owned(),
+              right: Arc::new(make_empty_node()),
             }
-            None => unreachable!("expected data in middle branch"),
+          } else {
+            Branch {
+              size: *size - 1,
+              depth: decide_parent_depth(&[left, &changed_branch, right]),
+              left: left.to_owned(),
+              middle: Arc::new(make_empty_node()),
+              right: right.to_owned(),
+            }
           }
         } else {
-          match &right {
-            Some(br) => {
-              let changed_branch = br.dissoc(idx - left_size - middle_size);
-              result = Branch {
-                size: *size - 1,
-                depth: decide_parent_depth_op(&[
-                  left,
-                  middle,
-                  &Some(Arc::new(changed_branch.to_owned())),
-                ]),
-                left: left.to_owned(),
-                middle: middle.to_owned(),
-                right: Some(Arc::new(changed_branch.to_owned())),
-              }
-            }
-            None => unreachable!("expected data in right branch"),
+          let changed_branch = right.dissoc(idx - left.len() - middle.len());
+          result = Branch {
+            size: *size - 1,
+            depth: decide_parent_depth(&[left, middle, &changed_branch]),
+            left: left.to_owned(),
+            middle: middle.to_owned(),
+            right: Arc::new(changed_branch.to_owned()),
           }
         }
 
@@ -631,11 +486,8 @@ impl<T: Clone + fmt::Display + Eq + PartialEq> TernaryTreeList<T> {
             depth,
             size,
           } => {
-            if middle == &None {
-              match left {
-                Some(br) => (**br).clone(),
-                None => make_empty_node(),
-              }
+            if **middle == Empty {
+              (**left).to_owned()
             } else {
               Branch {
                 left: left.to_owned(),
@@ -646,6 +498,7 @@ impl<T: Clone + fmt::Display + Eq + PartialEq> TernaryTreeList<T> {
               }
             }
           }
+          Empty => unreachable!("unexpected empty"),
           Leaf { .. } => unreachable!("should not found leaf"),
         }
       }
@@ -671,28 +524,23 @@ impl<T: Clone + fmt::Display + Eq + PartialEq> TernaryTreeList<T> {
     }
 
     match self {
+      Empty => unreachable!("Empty node is not a correct position for inserting"),
       Leaf { .. } => {
         if after {
           Branch {
             depth: self.get_depth() + 1,
             size: 2,
-            left: Some(Arc::new(self.to_owned())),
-            middle: Some(Arc::new(Leaf {
-              size: 1,
-              value: item,
-            })),
-            right: Some(Arc::new(make_empty_node())),
+            left: Arc::new(self.to_owned()),
+            middle: Arc::new(Leaf(item)),
+            right: Arc::new(make_empty_node()),
           }
         } else {
           Branch {
             depth: self.get_depth() + 1,
             size: 2,
-            left: Some(Arc::new(Leaf {
-              size: 1,
-              value: item,
-            })),
-            middle: Some(Arc::new(self.to_owned())),
-            right: Some(Arc::new(make_empty_node())),
+            left: Arc::new(Leaf(item)),
+            middle: Arc::new(self.to_owned()),
+            right: Arc::new(make_empty_node()),
           }
         }
       }
@@ -710,37 +558,28 @@ impl<T: Clone + fmt::Display + Eq + PartialEq> TernaryTreeList<T> {
               size: 2,
               depth: 2,
               left: left.to_owned(),
-              middle: Some(Arc::new(Leaf {
-                size: 1,
-                value: item,
-              })),
-              right: Some(Arc::new(make_empty_node())),
+              middle: Arc::new(Leaf(item)),
+              right: Arc::new(make_empty_node()),
             };
           } else {
             return Branch {
               size: 2,
-              depth: decide_parent_depth_op(&[middle]),
-              left: Some(Arc::new(Leaf {
-                size: 1,
-                value: item,
-              })),
+              depth: decide_parent_depth(&[middle]),
+              left: Arc::new(Leaf(item)),
               middle: left.to_owned(),
-              right: Some(Arc::new(make_empty_node())),
+              right: Arc::new(make_empty_node()),
             };
           }
         }
 
-        if self.len() == 2 && middle.is_some() {
+        if self.len() == 2 {
           if after {
             if idx == 0 {
               return Branch {
                 size: 3,
                 depth: 2,
                 left: left.to_owned(),
-                middle: Some(Arc::new(Leaf {
-                  size: 1,
-                  value: item,
-                })),
+                middle: Arc::new(Leaf(item)),
                 right: middle.to_owned(),
               };
             }
@@ -750,10 +589,7 @@ impl<T: Clone + fmt::Display + Eq + PartialEq> TernaryTreeList<T> {
                 depth: 2,
                 left: left.to_owned(),
                 middle: middle.to_owned(),
-                right: Some(Arc::new(Leaf {
-                  size: 1,
-                  value: item,
-                })),
+                right: Arc::new(Leaf(item)),
               };
             } else {
               unreachable!("cannot insert after position 2 since only 2 elements here");
@@ -762,10 +598,7 @@ impl<T: Clone + fmt::Display + Eq + PartialEq> TernaryTreeList<T> {
             return Branch {
               size: 3,
               depth: 2,
-              left: Some(Arc::new(Leaf {
-                size: 1,
-                value: item,
-              })),
+              left: Arc::new(Leaf(item)),
               middle: left.to_owned(),
               right: middle.to_owned(),
             };
@@ -774,10 +607,7 @@ impl<T: Clone + fmt::Display + Eq + PartialEq> TernaryTreeList<T> {
               size: 3,
               depth: 2,
               left: left.to_owned(),
-              middle: Some(Arc::new(Leaf {
-                size: 1,
-                value: item,
-              })),
+              middle: Arc::new(Leaf(item)),
               right: middle.to_owned(),
             };
           } else {
@@ -785,126 +615,80 @@ impl<T: Clone + fmt::Display + Eq + PartialEq> TernaryTreeList<T> {
           }
         }
 
-        let left_size = match left {
-          Some(br) => br.len(),
-          None => 0,
-        };
-        let middle_size = match middle {
-          Some(br) => br.len(),
-          None => 0,
-        };
-        let right_size = match right {
-          Some(br) => br.len(),
-          None => 0,
-        };
-
-        if left_size + middle_size + right_size != *size {
+        if left.len() + middle.len() + right.len() != *size {
           unreachable!("tree.size does not match sum case branch sizes");
         }
 
-        // echo "picking: ", idx, " ", left_size, " ", middle_size, " ", right_size
+        // echo "picking: ", idx, " ", left.len(), " ", middle.len(), " ", right.len()
 
-        if idx == 0 && !after && left_size >= middle_size && left_size >= right_size {
+        if idx == 0 && !after && left.len() >= middle.len() && left.len() >= right.len() {
           return Branch {
             size: *size + 1,
             depth: self.get_depth() + 1,
-            left: Some(Arc::new(Leaf {
-              size: 1,
-              value: item,
-            })),
-            middle: Some(Arc::new(self.to_owned())),
-            right: Some(Arc::new(make_empty_node())),
+            left: Arc::new(Leaf(item)),
+            middle: Arc::new(self.to_owned()),
+            right: Arc::new(make_empty_node()),
           };
         }
 
-        if idx == *size - 1 && after && right_size >= middle_size && right_size >= left_size {
+        if idx == *size - 1 && after && right.len() >= middle.len() && right.len() >= left.len() {
           return Branch {
             size: *size + 1,
             depth: self.get_depth() + 1,
-            left: Some(Arc::new(self.to_owned())),
-            middle: Some(Arc::new(Leaf {
-              size: 1,
-              value: item,
-            })),
-            right: Some(Arc::new(make_empty_node())),
+            left: Arc::new(self.to_owned()),
+            middle: Arc::new(Leaf(item)),
+            right: Arc::new(make_empty_node()),
           };
         }
 
-        if after && idx == *size - 1 && right_size == 0 && middle_size >= left_size {
+        if after && idx == *size - 1 && right.len() == 0 && middle.len() >= left.len() {
           return Branch {
             size: *size + 1,
             depth: self.get_depth(),
             left: left.to_owned(),
             middle: middle.to_owned(),
-            right: Some(Arc::new(Leaf {
-              size: 1,
-              value: item,
-            })),
+            right: Arc::new(Leaf(item)),
           };
         }
 
-        if !after && idx == 0 && right_size == 0 && middle_size >= right_size {
+        if !after && idx == 0 && right.len() == 0 && middle.len() >= right.len() {
           return Branch {
             size: *size + 1,
             depth: self.get_depth(),
-            left: Some(Arc::new(Leaf {
-              size: 1,
-              value: item,
-            })),
+            left: Arc::new(Leaf(item)),
             middle: left.to_owned(),
             right: middle.to_owned(),
           };
         }
 
-        if idx < left_size {
-          let changed_branch = match left {
-            Some(br) => br.insert(idx, item, after),
-            None => unreachable!("expected data on left branch"),
-          };
+        if idx < left.len() {
+          let changed_branch = left.insert(idx, item, after);
           Branch {
             size: *size + 1,
-            depth: decide_parent_depth_op(&[
-              &Some(Arc::new(changed_branch.to_owned())),
-              middle,
-              right,
-            ]),
-            left: Some(Arc::new(changed_branch.to_owned())),
+            depth: decide_parent_depth(&[&changed_branch, middle, right]),
+            left: Arc::new(changed_branch.to_owned()),
             middle: middle.to_owned(),
             right: right.to_owned(),
           }
-        } else if idx < left_size + middle_size {
-          let changed_branch = match middle {
-            Some(br) => br.insert(idx - left_size, item, after),
-            None => unreachable!("expected data on middle branch"),
-          };
+        } else if idx < left.len() + middle.len() {
+          let changed_branch = middle.insert(idx - left.len(), item, after);
 
           Branch {
             size: *size + 1,
-            depth: decide_parent_depth_op(&[
-              left,
-              &Some(Arc::new(changed_branch.to_owned())),
-              right,
-            ]),
+            depth: decide_parent_depth(&[left, &changed_branch.to_owned(), right]),
             left: left.to_owned(),
-            middle: Some(Arc::new(changed_branch.to_owned())),
+            middle: Arc::new(changed_branch.to_owned()),
             right: right.to_owned(),
           }
         } else {
-          let changed_branch = match right {
-            Some(br) => br.insert(idx - left_size - middle_size, item, after),
-            None => unreachable!("expected data on right branch"),
-          };
+          let changed_branch = right.insert(idx - left.len() - middle.len(), item, after);
 
           Branch {
             size: *size + 1,
-            depth: decide_parent_depth_op(&[
-              left,
-              middle,
-              &Some(Arc::new(changed_branch.to_owned())),
-            ]),
+            depth: decide_parent_depth(&[left, middle, &changed_branch]),
             left: left.to_owned(),
             middle: middle.to_owned(),
-            right: Some(Arc::new(changed_branch.to_owned())),
+            right: Arc::new(changed_branch.to_owned()),
           }
         }
       }
@@ -920,6 +704,7 @@ impl<T: Clone + fmt::Display + Eq + PartialEq> TernaryTreeList<T> {
   pub fn force_inplace_balancing(&mut self) {
     let ys = self.to_owned().to_leaves();
     match self {
+      Empty => {}
       Branch {
         ref mut left,
         ref mut middle,
@@ -928,7 +713,7 @@ impl<T: Clone + fmt::Display + Eq + PartialEq> TernaryTreeList<T> {
         ..
       } => {
         // echo "Force inplace balancing case list: ", tree.size
-        let new_tree = Self::make_list(ys.len(), 0, &ys);
+        let new_tree = Self::rebuild_list(ys.len(), 0, &ys);
         // let new_tree = initTernaryTreeList(ys)
         match new_tree {
           Branch {
@@ -940,8 +725,9 @@ impl<T: Clone + fmt::Display + Eq + PartialEq> TernaryTreeList<T> {
             *left = left2.to_owned();
             *middle = middle2.to_owned();
             *right = right2.to_owned();
-            *depth = decide_parent_depth_op(&[&left2, &middle2, &right2]);
+            *depth = decide_parent_depth(&[&left2, &middle2, &right2]);
           }
+          Empty => unreachable!("expected some data"),
           Leaf { .. } => {
             unreachable!("expected leaf data")
           }
@@ -960,10 +746,7 @@ impl<T: Clone + fmt::Display + Eq + PartialEq> TernaryTreeList<T> {
 
   pub fn prepend(&self, item: T, disable_balancing: bool) -> Self {
     if self.is_empty() {
-      return Leaf {
-        size: 1,
-        value: item,
-      };
+      return Leaf(item);
     }
 
     let mut result = self.insert(0, item, false);
@@ -976,10 +759,7 @@ impl<T: Clone + fmt::Display + Eq + PartialEq> TernaryTreeList<T> {
   }
   pub fn append(&self, item: T, disable_balancing: bool) -> Self {
     if self.is_empty() {
-      return Leaf {
-        size: 1,
-        value: item,
-      };
+      return Leaf(item);
     }
     let mut result = self.insert(self.len() - 1, item, true);
 
@@ -989,21 +769,23 @@ impl<T: Clone + fmt::Display + Eq + PartialEq> TernaryTreeList<T> {
     result
   }
   pub fn concat(xs_groups: &[TernaryTreeList<T>]) -> Self {
-    let mut result = Self::make_list(xs_groups.len(), 0, xs_groups);
+    let mut ys: Vec<TernaryTreeList<T>> = vec![];
+    for x in xs_groups {
+      if !x.is_empty() {
+        ys.push(x.to_owned())
+      }
+    }
+    let mut result = Self::rebuild_list(ys.len(), 0, &ys);
     result.maybe_reblance();
     result
   }
-  pub fn check_list_structure(&self) -> Result<(), String> {
+  pub fn check_structure(&self) -> Result<(), String> {
     if self.is_empty() {
       Ok(())
     } else {
       match self {
-        Leaf { size, .. } => {
-          if *size != 1 {
-            return Err(String::from("Bad size at node ${formatListInline(tree)}"));
-          }
-          Ok(())
-        }
+        Empty => Ok(()),
+        Leaf { .. } => Ok(()),
         Branch {
           left,
           middle,
@@ -1011,35 +793,21 @@ impl<T: Clone + fmt::Display + Eq + PartialEq> TernaryTreeList<T> {
           size,
           depth,
         } => {
-          let left_size = match left {
-            Some(br) => br.len(),
-            None => 0,
-          };
-          let middle_size = match middle {
-            Some(br) => br.len(),
-            None => 0,
-          };
-          let right_size = match right {
-            Some(br) => br.len(),
-            None => 0,
-          };
-          if *size != left_size + middle_size + right_size {
+          if !self.is_empty() && *size == 0 {
+            unreachable!("branch but has size")
+          }
+
+          if *size != left.len() + middle.len() + right.len() {
             unreachable!("Bad size at branch ${formatListInline(tree)}");
           }
 
-          if *depth != decide_parent_depth_op(&[left, middle, right]) {
+          if *depth != decide_parent_depth(&[left, middle, right]) {
             return Err(format!("Bad depth at branch {}", self.format_inline()));
           }
 
-          if let Some(br) = left {
-            br.check_list_structure()?;
-          }
-          if let Some(br) = middle {
-            br.check_list_structure()?;
-          }
-          if let Some(br) = right {
-            br.check_list_structure()?;
-          }
+          left.check_structure()?;
+          middle.check_structure()?;
+          right.check_structure()?;
 
           Ok(())
         }
@@ -1053,19 +821,17 @@ impl<T: Clone + fmt::Display + Eq + PartialEq> TernaryTreeList<T> {
       unreachable!("Slice range too large {end_idx} for {tree}");
     }
     if start_idx > end_idx {
-      unreachable!("Invalid slice range {start_idx}..{end_idx} for {tree}");
+      unreachable!(
+        "Invalid slice range {}..{} for {}",
+        start_idx, end_idx, self
+      );
     }
     if start_idx == end_idx {
-      return Branch {
-        size: 0,
-        depth: 0,
-        left: None,
-        middle: None,
-        right: None,
-      };
+      return Empty;
     }
 
     match self {
+      Empty => unreachable!("slicing from empty"),
       Leaf { .. } => {
         if start_idx == 0 && end_idx == 1 {
           self.to_owned()
@@ -1083,89 +849,44 @@ impl<T: Clone + fmt::Display + Eq + PartialEq> TernaryTreeList<T> {
           return self.to_owned();
         }
 
-        let left_size = match left {
-          Some(br) => br.len(),
-          None => 0,
-        };
-        let middle_size = match middle {
-          Some(br) => br.len(),
-          None => 0,
-        };
-        let right_size = match right {
-          Some(br) => br.len(),
-          None => 0,
-        };
+        // echo "sizes: {left.len()} {middle.len()} {right.len()}"
 
-        // echo "sizes: {left_size} {middle_size} {right_size}"
-
-        if start_idx >= left_size + middle_size {
-          match right {
-            Some(br) => {
-              return br.slice(
-                start_idx - left_size - middle_size,
-                end_idx - left_size - middle_size,
-              );
-            }
-            None => unreachable!("expected data on right branch"),
-          }
+        if start_idx >= left.len() + middle.len() {
+          return right.slice(
+            start_idx - left.len() - middle.len(),
+            end_idx - left.len() - middle.len(),
+          );
         }
-        if start_idx >= left_size {
-          if end_idx <= left_size + middle_size {
-            match middle {
-              Some(br) => {
-                return br.slice(start_idx - left_size, end_idx - left_size);
-              }
-              None => unreachable!("expected data on middle branch"),
-            }
+        if start_idx >= left.len() {
+          if end_idx <= left.len() + middle.len() {
+            return middle.slice(start_idx - left.len(), end_idx - left.len());
           } else {
-            match (middle, right) {
-              (Some(middle_br), Some(right_br)) => {
-                let middle_cut = middle_br.slice(start_idx - left_size, middle_size);
-                let right_cut = right_br.slice(0, end_idx - left_size - middle_size);
-                return Self::concat(&[middle_cut, right_cut]);
-              }
-              (_, _) => unreachable!("expected data on middle and right branches"),
-            }
+            let middle_cut = middle.slice(start_idx - left.len(), middle.len());
+            let right_cut = right.slice(0, end_idx - left.len() - middle.len());
+            return Self::concat(&[middle_cut, right_cut]);
           }
         }
 
-        if end_idx <= left_size {
-          match left {
-            Some(br) => {
-              return br.slice(start_idx, end_idx);
-            }
-            None => {
-              unreachable!("expected data on right branch")
-            }
-          }
+        if end_idx <= left.len() {
+          return left.slice(start_idx, end_idx);
         }
 
-        if end_idx <= left_size + middle_size {
-          match (left, middle) {
-            (Some(left_br), Some(middle_br)) => {
-              let left_cut = left_br.slice(start_idx, left_size);
-              let middle_cut = middle_br.slice(0, end_idx - left_size);
-              return Self::concat(&[left_cut, middle_cut]);
-            }
-            (_, _) => unreachable!("expected some data on left and middle branches"),
-          }
+        if end_idx <= left.len() + middle.len() {
+          let left_cut = left.slice(start_idx, left.len());
+          let middle_cut = middle.slice(0, end_idx - left.len());
+          return Self::concat(&[left_cut, middle_cut]);
         }
 
-        if end_idx <= left_size + middle_size + right_size {
-          match (left, right) {
-            (Some(left_br), Some(right_br)) => {
-              let left_cut = left_br.slice(start_idx, left_size);
-              let right_cut = right_br.slice(0, end_idx - left_size - middle_size);
-              match middle {
-                Some(br) => {
-                  return Self::concat(&[left_cut, (**br).clone(), right_cut]);
-                }
-                None => {
-                  return Self::concat(&[left_cut, right_cut]);
-                }
-              }
+        if end_idx <= left.len() + middle.len() + right.len() {
+          let left_cut = left.slice(start_idx, left.len());
+          let right_cut = right.slice(0, end_idx - left.len() - middle.len());
+          match &**middle {
+            Empty => {
+              return Self::concat(&[left_cut, right_cut]);
             }
-            (_, _) => unreachable!("expected some data on left and right branches"),
+            _ => {
+              return Self::concat(&[left_cut, (**middle).to_owned(), right_cut]);
+            }
           }
         }
         unreachable!("Unknown");
@@ -1179,6 +900,7 @@ impl<T: Clone + fmt::Display + Eq + PartialEq> TernaryTreeList<T> {
     }
 
     match self {
+      Empty => Empty,
       Leaf { .. } => self.to_owned(),
       Branch {
         left,
@@ -1189,28 +911,16 @@ impl<T: Clone + fmt::Display + Eq + PartialEq> TernaryTreeList<T> {
       } => Branch {
         size: *size,
         depth: *depth,
-        left: right.to_owned().map(|x| Arc::new(x.reverse())),
-        middle: middle.to_owned().map(|x| Arc::new(x.reverse())),
-        right: left.to_owned().map(|x| Arc::new(x.reverse())),
+        left: Arc::new(right.reverse()),
+        middle: Arc::new(middle.reverse()),
+        right: Arc::new(left.reverse()),
       },
     }
   }
   pub fn map<V>(&self, f: Arc<dyn Fn(&T) -> V>) -> TernaryTreeList<V> {
-    if self.is_empty() {
-      return Branch {
-        size: 0,
-        depth: 1,
-        left: None,
-        middle: None,
-        right: None,
-      };
-    }
-
     match self {
-      Leaf { value, .. } => Leaf {
-        value: f(value),
-        size: 1,
-      },
+      Empty => Empty,
+      Leaf(value) => Leaf(f(value)),
       Branch {
         left,
         middle,
@@ -1220,16 +930,27 @@ impl<T: Clone + fmt::Display + Eq + PartialEq> TernaryTreeList<T> {
       } => Branch {
         size: *size,
         depth: *depth,
-        left: left.to_owned().map(|br| Arc::new(br.map(f.clone()))),
-        middle: middle.to_owned().map(|br| Arc::new(br.map(f.clone()))),
-        right: right.to_owned().map(|br| Arc::new(br.map(f.clone()))),
+        left: Arc::new(left.map(f.clone())),
+        middle: Arc::new(middle.map(f.clone())),
+        right: Arc::new(right.map(f.clone())),
       },
     }
+  }
+
+  pub fn to_vec(&self) -> Vec<T> {
+    let mut xs = vec![];
+
+    // TODO
+    for item in self.to_owned() {
+      xs.push(item.to_owned());
+    }
+
+    xs
   }
 }
 
 // pass several children here
-fn decide_parent_depth<T: Clone + fmt::Display + Eq + PartialEq>(
+fn decide_parent_depth<T: Clone + fmt::Display + Eq + PartialEq + fmt::Debug>(
   xs: &[&TernaryTreeList<T>],
 ) -> usize {
   let mut depth = 0;
@@ -1243,29 +964,21 @@ fn decide_parent_depth<T: Clone + fmt::Display + Eq + PartialEq>(
   depth + 1
 }
 
-// pass several children here
-fn decide_parent_depth_op<T: Clone + fmt::Display + Eq + PartialEq>(
-  xs: &[&Option<Arc<TernaryTreeList<T>>>],
-) -> usize {
-  let mut depth = 0;
-  for x in xs {
-    match x {
-      Some(x2) => {
-        let y = x2.get_depth();
-        if y > depth {
-          depth = y;
-        }
-      }
-      None => {}
-    }
-  }
-
-  depth + 1
-}
-
-impl<T: Clone + fmt::Display + Eq + PartialEq> fmt::Display for TernaryTreeList<T> {
+impl<T: Clone + fmt::Display + Eq + PartialEq + fmt::Debug> fmt::Display for TernaryTreeList<T> {
   fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
     write!(f, "TernaryTreeList[{}, ...]", self.len())
+  }
+}
+
+impl<T: Clone + fmt::Display + Eq + PartialEq + fmt::Debug> IntoIterator for TernaryTreeList<T> {
+  type Item = T;
+  type IntoIter = TernaryTreeIntoIterator<T>;
+
+  fn into_iter(self) -> Self::IntoIter {
+    TernaryTreeIntoIterator {
+      value: self,
+      index: 0,
+    }
   }
 }
 
@@ -1274,14 +987,22 @@ pub struct TernaryTreeIntoIterator<T> {
   index: usize,
 }
 
-impl<T: Clone + fmt::Display + Eq + PartialEq> Iterator for TernaryTreeIntoIterator<T> {
+impl<T: Clone + fmt::Display + Eq + PartialEq + fmt::Debug> Iterator
+  for TernaryTreeIntoIterator<T>
+{
   type Item = T;
   fn next(&mut self) -> Option<Self::Item> {
-    self.value.get(self.index)
+    if self.index < self.value.len() {
+      let ret = self.value.get(self.index);
+      self.index += 1;
+      ret
+    } else {
+      None
+    }
   }
 }
 
-impl<T: Clone + fmt::Display + Eq + PartialEq> PartialEq for TernaryTreeList<T> {
+impl<T: Clone + fmt::Display + Eq + PartialEq + fmt::Debug> PartialEq for TernaryTreeList<T> {
   fn eq(&self, ys: &Self) -> bool {
     if self.len() != ys.len() {
       return false;
@@ -1296,15 +1017,40 @@ impl<T: Clone + fmt::Display + Eq + PartialEq> PartialEq for TernaryTreeList<T> 
     true
   }
 }
-impl<T: Clone + fmt::Display + Eq + PartialEq> Eq for TernaryTreeList<T> {}
+impl<T: Clone + fmt::Display + Eq + PartialEq + fmt::Debug> Eq for TernaryTreeList<T> {}
 
 fn make_empty_node<T>() -> TernaryTreeList<T> {
-  Branch {
-    size: 0,
-    depth: 1,
-    left: None,
-    middle: None,
-    right: None,
+  Empty
+}
+
+/// internal function for mutable writing
+fn write_leaves<T: Clone + fmt::Display + Eq + PartialEq + fmt::Debug>(
+  xs: &TernaryTreeList<T>,
+  acc: /* var */ &mut Vec<TernaryTreeList<T>>,
+  counter: &RefCell<usize>,
+) {
+  if xs.is_empty() {
+    return;
+  }
+
+  match xs {
+    Empty => {}
+    Leaf { .. } => {
+      let idx = counter.take();
+      acc.push(xs.to_owned());
+
+      counter.replace(idx + 1);
+    }
+    Branch {
+      left,
+      middle,
+      right,
+      ..
+    } => {
+      write_leaves(left, acc, counter);
+      write_leaves(middle, acc, counter);
+      write_leaves(right, acc, counter);
+    }
   }
 }
 
