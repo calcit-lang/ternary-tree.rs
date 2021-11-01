@@ -15,6 +15,7 @@
 mod util;
 
 use std::cell::RefCell;
+use std::cmp;
 use std::cmp::Ordering;
 use std::fmt;
 use std::fmt::{Debug, Display};
@@ -26,16 +27,16 @@ use util::{divide_ternary_sizes, rough_int_pow};
 
 #[derive(Clone, Debug)]
 pub enum TernaryTreeList<T> {
+  Empty,
+  Leaf(Arc<T>),
   Branch {
     size: usize,
-    /// TODO currently depth is inconsistent
+    /// TODO currently depth could be inconsistent
     depth: u8,
     left: Arc<TernaryTreeList<T>>,
     middle: Arc<TernaryTreeList<T>>,
     right: Arc<TernaryTreeList<T>>,
   },
-  Leaf(Arc<T>),
-  Empty,
 }
 
 use TernaryTreeList::*;
@@ -45,7 +46,7 @@ impl<'a, T: Clone + Display + Eq + PartialEq + Debug + Ord + PartialOrd + Hash> 
   pub fn get_depth(&self) -> u8 {
     match self {
       Empty => 0,
-      Leaf { .. } => 1,
+      Leaf { .. } => 0,
       Branch { depth, .. } => depth.to_owned(),
     }
   }
@@ -84,7 +85,7 @@ impl<'a, T: Clone + Display + Eq + PartialEq + Debug + Ord + PartialOrd + Hash> 
           left: Arc::new(left.to_owned()),
           middle: Arc::new(middle.to_owned()),
           right: Arc::new(Empty),
-          depth: decide_parent_depth(&[left, middle]),
+          depth: decide_parent_depth_2(left, middle),
         }
       }
       3 => {
@@ -96,7 +97,7 @@ impl<'a, T: Clone + Display + Eq + PartialEq + Debug + Ord + PartialOrd + Hash> 
           left: Arc::new(left.to_owned()),
           middle: Arc::new(middle.to_owned()),
           right: Arc::new(right.to_owned()),
-          depth: decide_parent_depth(&[left, middle, right]),
+          depth: decide_parent_depth_3(left, middle, right),
         }
       }
       _ => {
@@ -107,7 +108,7 @@ impl<'a, T: Clone + Display + Eq + PartialEq + Debug + Ord + PartialOrd + Hash> 
         let right = Self::rebuild_list(divided.2, offset + divided.0 + divided.1, xs);
         Branch {
           size: left.len() + middle.len() + right.len(),
-          depth: decide_parent_depth(&[&left, &middle, &right]),
+          depth: decide_parent_depth_3(&left, &middle, &right),
           left: Arc::new(left),
           middle: Arc::new(middle),
           right: Arc::new(right),
@@ -251,10 +252,6 @@ impl<'a, T: Clone + Display + Eq + PartialEq + Debug + Ord + PartialOrd + Hash> 
     }
 
     if self.len() != ys.len() {
-      return false;
-    }
-
-    if self.get_depth() != ys.get_depth() {
       return false;
     }
 
@@ -405,7 +402,7 @@ impl<'a, T: Clone + Display + Eq + PartialEq + Debug + Ord + PartialOrd + Hash> 
           let changed_branch = left.assoc(idx, item);
           Branch {
             size: size.to_owned(),
-            depth: decide_parent_depth(&[&changed_branch, middle, right]),
+            depth: decide_parent_depth_3(&changed_branch, middle, right),
             left: Arc::new(changed_branch),
             middle: middle.to_owned(),
             right: right.to_owned(),
@@ -414,7 +411,7 @@ impl<'a, T: Clone + Display + Eq + PartialEq + Debug + Ord + PartialOrd + Hash> 
           let changed_branch = middle.assoc(idx - left.len(), item);
           Branch {
             size: size.to_owned(),
-            depth: decide_parent_depth(&[left, &changed_branch, right]),
+            depth: decide_parent_depth_3(left, &changed_branch, right),
             left: left.to_owned(),
             middle: Arc::new(changed_branch),
             right: right.to_owned(),
@@ -423,7 +420,7 @@ impl<'a, T: Clone + Display + Eq + PartialEq + Debug + Ord + PartialOrd + Hash> 
           let changed_branch = right.assoc(idx - left.len() - middle.len(), item);
           Branch {
             size: size.to_owned(),
-            depth: decide_parent_depth(&[left, middle, &changed_branch]),
+            depth: decide_parent_depth_3(left, middle, &changed_branch),
             left: left.to_owned(),
             middle: middle.to_owned(),
             right: Arc::new(changed_branch.to_owned()),
@@ -466,7 +463,7 @@ impl<'a, T: Clone + Display + Eq + PartialEq + Debug + Ord + PartialOrd + Hash> 
           result = if changed_branch.is_empty() {
             Branch {
               size: *size - 1,
-              depth: decide_parent_depth(&[middle, right]),
+              depth: decide_parent_depth_2(middle, right),
               left: middle.to_owned(),
               middle: right.to_owned(),
               right: Arc::new(Empty),
@@ -474,7 +471,7 @@ impl<'a, T: Clone + Display + Eq + PartialEq + Debug + Ord + PartialOrd + Hash> 
           } else {
             Branch {
               size: *size - 1,
-              depth: decide_parent_depth(&[&changed_branch, middle, right]),
+              depth: decide_parent_depth_3(&changed_branch, middle, right),
               left: Arc::new(changed_branch.to_owned()),
               middle: middle.to_owned(),
               right: right.to_owned(),
@@ -485,7 +482,7 @@ impl<'a, T: Clone + Display + Eq + PartialEq + Debug + Ord + PartialOrd + Hash> 
           result = if changed_branch.is_empty() {
             Branch {
               size: *size - 1,
-              depth: decide_parent_depth(&[left, &changed_branch, right]),
+              depth: decide_parent_depth_3(left, &changed_branch, right),
               left: left.to_owned(),
               middle: right.to_owned(),
               right: Arc::new(Empty),
@@ -493,7 +490,7 @@ impl<'a, T: Clone + Display + Eq + PartialEq + Debug + Ord + PartialOrd + Hash> 
           } else {
             Branch {
               size: *size - 1,
-              depth: decide_parent_depth(&[left, &changed_branch, right]),
+              depth: decide_parent_depth_3(left, &changed_branch, right),
               left: left.to_owned(),
               middle: Arc::new(Empty),
               right: right.to_owned(),
@@ -503,7 +500,7 @@ impl<'a, T: Clone + Display + Eq + PartialEq + Debug + Ord + PartialOrd + Hash> 
           let changed_branch = right.dissoc(idx - left.len() - middle.len());
           result = Branch {
             size: *size - 1,
-            depth: decide_parent_depth(&[left, middle, &changed_branch]),
+            depth: decide_parent_depth_3(left, middle, &changed_branch),
             left: left.to_owned(),
             middle: middle.to_owned(),
             right: Arc::new(changed_branch.to_owned()),
@@ -551,16 +548,18 @@ impl<'a, T: Clone + Display + Eq + PartialEq + Debug + Ord + PartialOrd + Hash> 
   }
 
   pub fn insert(&self, idx: usize, item: T, after: bool) -> Self {
-    if self.is_empty() {
-      unreachable!("Empty node is not a correct position for inserting")
-    }
-
     match self {
-      Empty => unreachable!("Empty node is not a correct position for inserting"),
+      Empty => {
+        if idx == 0 {
+          Leaf(Arc::new(item))
+        } else {
+          unreachable!("Empty node is not a correct position for inserting")
+        }
+      }
       Leaf { .. } => {
         if after {
           Branch {
-            depth: self.get_depth() + 1,
+            depth: 1,
             size: 2,
             left: Arc::new(self.to_owned()),
             middle: Arc::new(Leaf(Arc::new(item))),
@@ -568,7 +567,7 @@ impl<'a, T: Clone + Display + Eq + PartialEq + Debug + Ord + PartialOrd + Hash> 
           }
         } else {
           Branch {
-            depth: self.get_depth() + 1,
+            depth: 1,
             size: 2,
             left: Arc::new(Leaf(Arc::new(item))),
             middle: Arc::new(self.to_owned()),
@@ -581,6 +580,7 @@ impl<'a, T: Clone + Display + Eq + PartialEq + Debug + Ord + PartialOrd + Hash> 
         middle,
         right,
         size,
+        depth,
         ..
       } => {
         if self.len() == 1 {
@@ -588,7 +588,7 @@ impl<'a, T: Clone + Display + Eq + PartialEq + Debug + Ord + PartialOrd + Hash> 
             // in compact mode, values placed at left
             return Branch {
               size: 2,
-              depth: 2,
+              depth: 1,
               left: left.to_owned(),
               middle: Arc::new(Leaf(Arc::new(item))),
               right: Arc::new(Empty),
@@ -596,7 +596,7 @@ impl<'a, T: Clone + Display + Eq + PartialEq + Debug + Ord + PartialOrd + Hash> 
           } else {
             return Branch {
               size: 2,
-              depth: decide_parent_depth(&[middle]),
+              depth: 1,
               left: Arc::new(Leaf(Arc::new(item))),
               middle: left.to_owned(),
               right: Arc::new(Empty),
@@ -609,7 +609,7 @@ impl<'a, T: Clone + Display + Eq + PartialEq + Debug + Ord + PartialOrd + Hash> 
             if idx == 0 {
               return Branch {
                 size: 3,
-                depth: 2,
+                depth: 1,
                 left: left.to_owned(),
                 middle: Arc::new(Leaf(Arc::new(item))),
                 right: middle.to_owned(),
@@ -618,7 +618,7 @@ impl<'a, T: Clone + Display + Eq + PartialEq + Debug + Ord + PartialOrd + Hash> 
             if idx == 1 {
               return Branch {
                 size: 3,
-                depth: 2,
+                depth: 1,
                 left: left.to_owned(),
                 middle: middle.to_owned(),
                 right: Arc::new(Leaf(Arc::new(item))),
@@ -629,7 +629,7 @@ impl<'a, T: Clone + Display + Eq + PartialEq + Debug + Ord + PartialOrd + Hash> 
           } else if idx == 0 {
             return Branch {
               size: 3,
-              depth: 2,
+              depth: 1,
               left: Arc::new(Leaf(Arc::new(item))),
               middle: left.to_owned(),
               right: middle.to_owned(),
@@ -637,7 +637,7 @@ impl<'a, T: Clone + Display + Eq + PartialEq + Debug + Ord + PartialOrd + Hash> 
           } else if idx == 1 {
             return Branch {
               size: 3,
-              depth: 2,
+              depth: 1,
               left: left.to_owned(),
               middle: Arc::new(Leaf(Arc::new(item))),
               right: middle.to_owned(),
@@ -656,7 +656,7 @@ impl<'a, T: Clone + Display + Eq + PartialEq + Debug + Ord + PartialOrd + Hash> 
         if idx == 0 && !after && left.len() >= middle.len() && left.len() >= right.len() {
           return Branch {
             size: *size + 1,
-            depth: self.get_depth() + 1,
+            depth: depth + 1,
             left: Arc::new(Leaf(Arc::new(item))),
             middle: Arc::new(self.to_owned()),
             right: Arc::new(Empty),
@@ -666,7 +666,7 @@ impl<'a, T: Clone + Display + Eq + PartialEq + Debug + Ord + PartialOrd + Hash> 
         if idx == *size - 1 && after && right.len() >= middle.len() && right.len() >= left.len() {
           return Branch {
             size: *size + 1,
-            depth: self.get_depth() + 1,
+            depth: depth + 1,
             left: Arc::new(self.to_owned()),
             middle: Arc::new(Leaf(Arc::new(item))),
             right: Arc::new(Empty),
@@ -676,7 +676,7 @@ impl<'a, T: Clone + Display + Eq + PartialEq + Debug + Ord + PartialOrd + Hash> 
         if after && idx == *size - 1 && right.len() == 0 && middle.len() >= left.len() {
           return Branch {
             size: *size + 1,
-            depth: self.get_depth(),
+            depth: depth.to_owned(),
             left: left.to_owned(),
             middle: middle.to_owned(),
             right: Arc::new(Leaf(Arc::new(item))),
@@ -686,7 +686,7 @@ impl<'a, T: Clone + Display + Eq + PartialEq + Debug + Ord + PartialOrd + Hash> 
         if !after && idx == 0 && right.len() == 0 && middle.len() >= right.len() {
           return Branch {
             size: *size + 1,
-            depth: self.get_depth(),
+            depth: depth.to_owned(),
             left: Arc::new(Leaf(Arc::new(item))),
             middle: left.to_owned(),
             right: middle.to_owned(),
@@ -697,7 +697,7 @@ impl<'a, T: Clone + Display + Eq + PartialEq + Debug + Ord + PartialOrd + Hash> 
           let changed_branch = left.insert(idx, item, after);
           Branch {
             size: *size + 1,
-            depth: decide_parent_depth(&[&changed_branch, middle, right]),
+            depth: decide_parent_depth_3(&changed_branch, middle, right),
             left: Arc::new(changed_branch.to_owned()),
             middle: middle.to_owned(),
             right: right.to_owned(),
@@ -707,7 +707,7 @@ impl<'a, T: Clone + Display + Eq + PartialEq + Debug + Ord + PartialOrd + Hash> 
 
           Branch {
             size: *size + 1,
-            depth: decide_parent_depth(&[left, &changed_branch.to_owned(), right]),
+            depth: decide_parent_depth_3(left, &changed_branch.to_owned(), right),
             left: left.to_owned(),
             middle: Arc::new(changed_branch.to_owned()),
             right: right.to_owned(),
@@ -717,7 +717,7 @@ impl<'a, T: Clone + Display + Eq + PartialEq + Debug + Ord + PartialOrd + Hash> 
 
           Branch {
             size: *size + 1,
-            depth: decide_parent_depth(&[left, middle, &changed_branch]),
+            depth: decide_parent_depth_3(left, middle, &changed_branch),
             left: left.to_owned(),
             middle: middle.to_owned(),
             right: Arc::new(changed_branch.to_owned()),
@@ -737,6 +737,7 @@ impl<'a, T: Clone + Display + Eq + PartialEq + Debug + Ord + PartialOrd + Hash> 
     let ys = self.to_owned().to_leaves();
     match self {
       Empty => {}
+      Leaf { .. } => {}
       Branch {
         ref mut left,
         ref mut middle,
@@ -750,14 +751,14 @@ impl<'a, T: Clone + Display + Eq + PartialEq + Debug + Ord + PartialOrd + Hash> 
         match new_tree {
           Branch {
             left: left2,
-            right: right2,
             middle: middle2,
+            right: right2,
             ..
           } => {
             *left = left2.to_owned();
             *middle = middle2.to_owned();
             *right = right2.to_owned();
-            *depth = decide_parent_depth(&[&left2, &middle2, &right2]);
+            *depth = decide_parent_depth_3(&left2, &middle2, &right2);
           }
           Empty => unreachable!("expected some data"),
           Leaf { .. } => {
@@ -765,14 +766,23 @@ impl<'a, T: Clone + Display + Eq + PartialEq + Debug + Ord + PartialOrd + Hash> 
           }
         }
       }
-      Leaf { .. } => {}
     }
   }
   // TODO, need better strategy for detecting
   pub fn maybe_reblance(&mut self) {
-    let current_depth = self.get_depth();
-    if current_depth > 50 && rough_int_pow(3, current_depth - 50) > self.len() {
-      self.force_inplace_balancing()
+    match self {
+      Empty => {}
+      Leaf(..) => {}
+      Branch { size, .. } => {
+        if *size < 81 {
+          // guessed number
+          return;
+        }
+        let current_depth = self.get_depth();
+        if current_depth > 20 && rough_int_pow(3, current_depth - 20) > self.len() {
+          self.force_inplace_balancing()
+        }
+      }
     }
   }
 
@@ -839,7 +849,7 @@ impl<'a, T: Clone + Display + Eq + PartialEq + Debug + Ord + PartialOrd + Hash> 
             unreachable!("Bad size at branch ${formatListInline(tree)}");
           }
 
-          if *depth != decide_parent_depth(&[left, middle, right]) {
+          if *depth != decide_parent_depth_3(left, middle, right) {
             return Err(format!("Bad depth at branch {}", self.format_inline()));
           }
 
@@ -988,18 +998,20 @@ impl<'a, T: Clone + Display + Eq + PartialEq + Debug + Ord + PartialOrd + Hash> 
 }
 
 // pass several children here
-fn decide_parent_depth<T: Clone + Display + Eq + PartialEq + Debug + Ord + PartialOrd + Hash>(
-  xs: &[&TernaryTreeList<T>],
+fn decide_parent_depth_2<T: Clone + Display + Eq + PartialEq + Debug + Ord + PartialOrd + Hash>(
+  x0: &TernaryTreeList<T>,
+  x1: &TernaryTreeList<T>,
 ) -> u8 {
-  let mut depth = 0;
-  for x in xs {
-    let y = x.get_depth();
-    if y > depth {
-      depth = y;
-    }
-  }
+  cmp::max(x0.get_depth(), x1.get_depth()) + 1
+}
 
-  depth + 1
+// pass several children here
+fn decide_parent_depth_3<T: Clone + Display + Eq + PartialEq + Debug + Ord + PartialOrd + Hash>(
+  x0: &TernaryTreeList<T>,
+  x1: &TernaryTreeList<T>,
+  x2: &TernaryTreeList<T>,
+) -> u8 {
+  cmp::max(cmp::max(x0.get_depth(), x1.get_depth()), x2.get_depth()) + 1
 }
 
 impl<T: Clone + Display + Eq + PartialEq + Debug + Ord + PartialOrd + Hash> Display
@@ -1119,9 +1131,7 @@ impl<T: Clone + Display + Eq + PartialEq + Debug + Ord + PartialOrd + Hash> Ord
     if self.len() == other.len() {
       for idx in 0..self.len() {
         match self.unsafe_get(idx).cmp(&other.unsafe_get(idx)) {
-          Ordering::Equal => {
-            continue;
-          }
+          Ordering::Equal => {}
           a => return a,
         }
       }
@@ -1173,7 +1183,7 @@ impl<T: Clone + Display + Eq + PartialEq + Debug + Ord + PartialOrd + Hash> Hash
 /// internal function for mutable writing
 fn write_leaves<T: Clone + Display + Eq + PartialEq + Debug + Ord + PartialOrd + Hash>(
   xs: &TernaryTreeList<T>,
-  acc: /* var */ &mut Vec<TernaryTreeList<T>>,
+  acc: &mut Vec<TernaryTreeList<T>>,
   counter: &RefCell<usize>,
 ) {
   if xs.is_empty() {
@@ -1200,33 +1210,3 @@ fn write_leaves<T: Clone + Display + Eq + PartialEq + Debug + Ord + PartialOrd +
     }
   }
 }
-
-// /// TODO, Iterator
-// pub fn listToItems(&self) -> Generator<T> {
-//   if (tree != null) {
-//     match (tree.kind) {
-//       case TernaryTreeKind.ternaryTreeLeaf: {
-//         yield tree.value;
-//         break;
-//       }
-//       case TernaryTreeKind.ternaryTreeBranch: {
-//         if (tree.left != null) {
-//           for (let x of listToItems(tree.left)) {
-//             yield x;
-//           }
-//         }
-//         if (tree.middle != null) {
-//           for (let x of listToItems(tree.middle)) {
-//             yield x;
-//           }
-//         }
-//         if (tree.right != null) {
-//           for (let x of listToItems(tree.right)) {
-//             yield x;
-//           }
-//         }
-//         break;
-//       }
-//     }
-//   }
-// }
