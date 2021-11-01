@@ -258,7 +258,7 @@ fn check_equality() -> Result<(), String> {
   assert!(data4 == data4n);
   assert!(data4 == data4_made);
   assert!(data4n == data4_made);
-  assert!(data4 != data4_made); // identical false
+  // assert!(data4 != data4_made); // identical false
 
   Ok(())
 }
@@ -336,7 +336,7 @@ fn slices() -> Result<(), String> {
   }
 
   for i in 0..40 {
-    for j in 0..40 {
+    for j in i..40 {
       assert_eq!(data.slice(i, j).to_vec(), list40[i..j]);
     }
   }

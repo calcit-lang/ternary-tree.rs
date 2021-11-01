@@ -305,15 +305,17 @@ impl<T: Clone + fmt::Display + Eq + PartialEq + fmt::Debug> TernaryTreeList<T> {
     }
   }
 
-  fn write_leaves(&self, acc: /* var */ &mut [TernaryTreeList<T>], counter: &RefCell<usize>) {
+  fn write_leaves(&self, acc: /* var */ &mut Vec<TernaryTreeList<T>>, counter: &RefCell<usize>) {
     if self.is_empty() {
       return;
     }
 
+    println!("branch {} {:?}", self.format_inline(), acc);
+
     match self {
       Leaf { .. } => {
         let idx = counter.take();
-        acc[idx] = self.to_owned();
+        acc.push(self.to_owned());
 
         counter.replace(idx + 1);
       }
@@ -338,8 +340,9 @@ impl<T: Clone + fmt::Display + Eq + PartialEq + fmt::Debug> TernaryTreeList<T> {
 
   pub fn to_leaves(&mut self) -> Vec<TernaryTreeList<T>> {
     let mut acc: Vec<TernaryTreeList<T>> = Vec::with_capacity(self.len());
-    let counter: RefCell<usize> = RefCell::new(5);
+    let counter: RefCell<usize> = RefCell::new(0);
     Self::write_leaves(self, &mut acc, &counter);
+    assert_eq!(acc.len(), self.len());
     acc
   }
 
@@ -419,11 +422,11 @@ impl<T: Clone + fmt::Display + Eq + PartialEq + fmt::Debug> TernaryTreeList<T> {
     }
 
     match self {
-      Leaf { value, .. } => {
+      Leaf { .. } => {
         if idx == 0 {
           Leaf {
             size: 1,
-            value: value.to_owned(),
+            value: item.to_owned(),
           }
         } else {
           unreachable!("Cannot get from leaf with index ${idx}")
@@ -992,7 +995,13 @@ impl<T: Clone + fmt::Display + Eq + PartialEq + fmt::Debug> TernaryTreeList<T> {
     result
   }
   pub fn concat(xs_groups: &[TernaryTreeList<T>]) -> Self {
-    let mut result = Self::make_list(xs_groups.len(), 0, xs_groups);
+    let mut ys: Vec<TernaryTreeList<T>> = vec![];
+    for x in xs_groups {
+      if !x.is_empty() {
+        ys.push(x.to_owned())
+      }
+    }
+    let mut result = Self::make_list(ys.len(), 0, &ys);
     result.maybe_reblance();
     result
   }
@@ -1056,7 +1065,10 @@ impl<T: Clone + fmt::Display + Eq + PartialEq + fmt::Debug> TernaryTreeList<T> {
       unreachable!("Slice range too large {end_idx} for {tree}");
     }
     if start_idx > end_idx {
-      unreachable!("Invalid slice range {start_idx}..{end_idx} for {tree}");
+      unreachable!(
+        "Invalid slice range {}..{} for {}",
+        start_idx, end_idx, self
+      );
     }
     if start_idx == end_idx {
       return Branch {
