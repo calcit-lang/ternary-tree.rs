@@ -29,7 +29,7 @@ pub enum TernaryTreeList<T> {
   Branch {
     size: usize,
     /// TODO currently depth is inconsistent
-    depth: usize,
+    depth: u8,
     left: Arc<TernaryTreeList<T>>,
     middle: Arc<TernaryTreeList<T>>,
     right: Arc<TernaryTreeList<T>>,
@@ -42,7 +42,7 @@ use TernaryTreeList::*;
 
 impl<'a, T: Clone + Display + Eq + PartialEq + Debug + Ord + PartialOrd + Hash> TernaryTreeList<T> {
   /// just get, will not compute recursively
-  pub fn get_depth(&self) -> usize {
+  pub fn get_depth(&self) -> u8 {
     match self {
       Empty => 0,
       Leaf { .. } => 1,
@@ -990,7 +990,7 @@ impl<'a, T: Clone + Display + Eq + PartialEq + Debug + Ord + PartialOrd + Hash> 
 // pass several children here
 fn decide_parent_depth<T: Clone + Display + Eq + PartialEq + Debug + Ord + PartialOrd + Hash>(
   xs: &[&TernaryTreeList<T>],
-) -> usize {
+) -> u8 {
   let mut depth = 0;
   for x in xs {
     let y = x.get_depth();
