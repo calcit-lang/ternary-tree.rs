@@ -15,12 +15,16 @@
 mod util;
 
 use std::cell::RefCell;
+use std::cmp::Ordering;
 use std::fmt;
+use std::fmt::{Debug, Display};
+use std::hash::{Hash, Hasher};
+use std::ops::Index;
 use std::sync::Arc;
 
 use util::{divide_ternary_sizes, rough_int_pow};
 
-#[derive(Clone, fmt::Debug)]
+#[derive(Clone, Debug)]
 pub enum TernaryTreeList<T> {
   Branch {
     size: usize,
@@ -30,13 +34,13 @@ pub enum TernaryTreeList<T> {
     middle: Arc<TernaryTreeList<T>>,
     right: Arc<TernaryTreeList<T>>,
   },
-  Leaf(T),
+  Leaf(Arc<T>),
   Empty,
 }
 
 use TernaryTreeList::*;
 
-impl<T: Clone + fmt::Display + Eq + PartialEq + fmt::Debug> TernaryTreeList<T> {
+impl<'a, T: Clone + Display + Eq + PartialEq + Debug + Ord + PartialOrd + Hash> TernaryTreeList<T> {
   /// just get, will not compute recursively
   pub fn get_depth(&self) -> usize {
     match self {
@@ -114,7 +118,7 @@ impl<T: Clone + fmt::Display + Eq + PartialEq + fmt::Debug> TernaryTreeList<T> {
   pub fn from(xs: &[T]) -> Self {
     let mut ys: Vec<Self> = Vec::with_capacity(xs.len());
     for x in xs {
-      ys.push(Leaf(x.to_owned()))
+      ys.push(Leaf(Arc::new((*x).to_owned())))
     }
 
     Self::rebuild_list(xs.len(), 0, &ys)
@@ -150,15 +154,15 @@ impl<T: Clone + fmt::Display + Eq + PartialEq + fmt::Debug> TernaryTreeList<T> {
     }
   }
 
-  pub fn get(&self, idx: usize) -> Option<T> {
-    if self.is_empty() {
+  pub fn get(&self, idx: usize) -> Option<&T> {
+    if self.is_empty() || idx >= self.len() {
       None
     } else {
-      Some(self.unsafe_get(idx))
+      Some(self.ref_get(idx))
     }
   }
 
-  // returns -1 if (not foun)
+  // returns -1 if (not found)
   pub fn find_index(&self, f: Arc<dyn Fn(&T) -> bool>) -> i64 {
     match self {
       Empty => -1,
@@ -200,7 +204,7 @@ impl<T: Clone + fmt::Display + Eq + PartialEq + fmt::Debug> TernaryTreeList<T> {
     match self {
       Empty => -1,
       Leaf(value) => {
-        if item == value {
+        if item == &**value {
           0
         } else {
           -1
@@ -283,6 +287,34 @@ impl<T: Clone + fmt::Display + Eq + PartialEq + fmt::Debug> TernaryTreeList<T> {
     acc
   }
 
+  pub fn ref_get(&self, idx: usize) -> &T {
+    // println!("get: {} {}", self.format_inline(), idx);
+    match self {
+      Empty => unreachable!("looking at empty"),
+      Leaf(value) => {
+        if idx == 0 {
+          value
+        } else {
+          unreachable!("expected 0")
+        }
+      }
+      Branch {
+        left,
+        middle,
+        right,
+        ..
+      } => {
+        if idx < left.len() {
+          left.ref_get(idx)
+        } else if idx < left.len() + middle.len() {
+          middle.ref_get(idx - left.len())
+        } else {
+          right.ref_get(idx - left.len() - middle.len())
+        }
+      }
+    }
+  }
+
   pub fn unsafe_get(&self, original_idx: usize) -> T {
     let mut tree_parent = self.to_owned();
     let mut idx = original_idx;
@@ -291,7 +323,7 @@ impl<T: Clone + fmt::Display + Eq + PartialEq + fmt::Debug> TernaryTreeList<T> {
         Empty => unreachable!("empty"),
         Leaf(value) => {
           if idx == 0 {
-            return value.to_owned();
+            return (*value).to_owned();
           } else {
             unreachable!("Cannot get from leaf with index ${idx}")
           }
@@ -353,7 +385,7 @@ impl<T: Clone + fmt::Display + Eq + PartialEq + fmt::Debug> TernaryTreeList<T> {
       }
       Leaf { .. } => {
         if idx == 0 {
-          Leaf(item.to_owned())
+          Leaf(Arc::new(item))
         } else {
           unreachable!("Cannot assoc leaf into index ${idx}")
         }
@@ -437,7 +469,7 @@ impl<T: Clone + fmt::Display + Eq + PartialEq + fmt::Debug> TernaryTreeList<T> {
               depth: decide_parent_depth(&[middle, right]),
               left: middle.to_owned(),
               middle: right.to_owned(),
-              right: Arc::new(make_empty_node()),
+              right: Arc::new(Empty),
             }
           } else {
             Branch {
@@ -456,14 +488,14 @@ impl<T: Clone + fmt::Display + Eq + PartialEq + fmt::Debug> TernaryTreeList<T> {
               depth: decide_parent_depth(&[left, &changed_branch, right]),
               left: left.to_owned(),
               middle: right.to_owned(),
-              right: Arc::new(make_empty_node()),
+              right: Arc::new(Empty),
             }
           } else {
             Branch {
               size: *size - 1,
               depth: decide_parent_depth(&[left, &changed_branch, right]),
               left: left.to_owned(),
-              middle: Arc::new(make_empty_node()),
+              middle: Arc::new(Empty),
               right: right.to_owned(),
             }
           }
@@ -531,16 +563,16 @@ impl<T: Clone + fmt::Display + Eq + PartialEq + fmt::Debug> TernaryTreeList<T> {
             depth: self.get_depth() + 1,
             size: 2,
             left: Arc::new(self.to_owned()),
-            middle: Arc::new(Leaf(item)),
-            right: Arc::new(make_empty_node()),
+            middle: Arc::new(Leaf(Arc::new(item))),
+            right: Arc::new(Empty),
           }
         } else {
           Branch {
             depth: self.get_depth() + 1,
             size: 2,
-            left: Arc::new(Leaf(item)),
+            left: Arc::new(Leaf(Arc::new(item))),
             middle: Arc::new(self.to_owned()),
-            right: Arc::new(make_empty_node()),
+            right: Arc::new(Empty),
           }
         }
       }
@@ -558,16 +590,16 @@ impl<T: Clone + fmt::Display + Eq + PartialEq + fmt::Debug> TernaryTreeList<T> {
               size: 2,
               depth: 2,
               left: left.to_owned(),
-              middle: Arc::new(Leaf(item)),
-              right: Arc::new(make_empty_node()),
+              middle: Arc::new(Leaf(Arc::new(item))),
+              right: Arc::new(Empty),
             };
           } else {
             return Branch {
               size: 2,
               depth: decide_parent_depth(&[middle]),
-              left: Arc::new(Leaf(item)),
+              left: Arc::new(Leaf(Arc::new(item))),
               middle: left.to_owned(),
-              right: Arc::new(make_empty_node()),
+              right: Arc::new(Empty),
             };
           }
         }
@@ -579,7 +611,7 @@ impl<T: Clone + fmt::Display + Eq + PartialEq + fmt::Debug> TernaryTreeList<T> {
                 size: 3,
                 depth: 2,
                 left: left.to_owned(),
-                middle: Arc::new(Leaf(item)),
+                middle: Arc::new(Leaf(Arc::new(item))),
                 right: middle.to_owned(),
               };
             }
@@ -589,7 +621,7 @@ impl<T: Clone + fmt::Display + Eq + PartialEq + fmt::Debug> TernaryTreeList<T> {
                 depth: 2,
                 left: left.to_owned(),
                 middle: middle.to_owned(),
-                right: Arc::new(Leaf(item)),
+                right: Arc::new(Leaf(Arc::new(item))),
               };
             } else {
               unreachable!("cannot insert after position 2 since only 2 elements here");
@@ -598,7 +630,7 @@ impl<T: Clone + fmt::Display + Eq + PartialEq + fmt::Debug> TernaryTreeList<T> {
             return Branch {
               size: 3,
               depth: 2,
-              left: Arc::new(Leaf(item)),
+              left: Arc::new(Leaf(Arc::new(item))),
               middle: left.to_owned(),
               right: middle.to_owned(),
             };
@@ -607,7 +639,7 @@ impl<T: Clone + fmt::Display + Eq + PartialEq + fmt::Debug> TernaryTreeList<T> {
               size: 3,
               depth: 2,
               left: left.to_owned(),
-              middle: Arc::new(Leaf(item)),
+              middle: Arc::new(Leaf(Arc::new(item))),
               right: middle.to_owned(),
             };
           } else {
@@ -625,9 +657,9 @@ impl<T: Clone + fmt::Display + Eq + PartialEq + fmt::Debug> TernaryTreeList<T> {
           return Branch {
             size: *size + 1,
             depth: self.get_depth() + 1,
-            left: Arc::new(Leaf(item)),
+            left: Arc::new(Leaf(Arc::new(item))),
             middle: Arc::new(self.to_owned()),
-            right: Arc::new(make_empty_node()),
+            right: Arc::new(Empty),
           };
         }
 
@@ -636,8 +668,8 @@ impl<T: Clone + fmt::Display + Eq + PartialEq + fmt::Debug> TernaryTreeList<T> {
             size: *size + 1,
             depth: self.get_depth() + 1,
             left: Arc::new(self.to_owned()),
-            middle: Arc::new(Leaf(item)),
-            right: Arc::new(make_empty_node()),
+            middle: Arc::new(Leaf(Arc::new(item))),
+            right: Arc::new(Empty),
           };
         }
 
@@ -647,7 +679,7 @@ impl<T: Clone + fmt::Display + Eq + PartialEq + fmt::Debug> TernaryTreeList<T> {
             depth: self.get_depth(),
             left: left.to_owned(),
             middle: middle.to_owned(),
-            right: Arc::new(Leaf(item)),
+            right: Arc::new(Leaf(Arc::new(item))),
           };
         }
 
@@ -655,7 +687,7 @@ impl<T: Clone + fmt::Display + Eq + PartialEq + fmt::Debug> TernaryTreeList<T> {
           return Branch {
             size: *size + 1,
             depth: self.get_depth(),
-            left: Arc::new(Leaf(item)),
+            left: Arc::new(Leaf(Arc::new(item))),
             middle: left.to_owned(),
             right: middle.to_owned(),
           };
@@ -744,9 +776,12 @@ impl<T: Clone + fmt::Display + Eq + PartialEq + fmt::Debug> TernaryTreeList<T> {
     }
   }
 
+  pub fn unshift(&self, item: T) -> Self {
+    self.prepend(item, false)
+  }
   pub fn prepend(&self, item: T, disable_balancing: bool) -> Self {
     if self.is_empty() {
-      return Leaf(item);
+      return Leaf(Arc::new(item));
     }
 
     let mut result = self.insert(0, item, false);
@@ -757,9 +792,12 @@ impl<T: Clone + fmt::Display + Eq + PartialEq + fmt::Debug> TernaryTreeList<T> {
 
     result
   }
+  pub fn push(&self, item: T) -> Self {
+    self.append(item, false)
+  }
   pub fn append(&self, item: T, disable_balancing: bool) -> Self {
     if self.is_empty() {
-      return Leaf(item);
+      return Leaf(Arc::new(item));
     }
     let mut result = self.insert(self.len() - 1, item, true);
 
@@ -920,7 +958,7 @@ impl<T: Clone + fmt::Display + Eq + PartialEq + fmt::Debug> TernaryTreeList<T> {
   pub fn map<V>(&self, f: Arc<dyn Fn(&T) -> V>) -> TernaryTreeList<V> {
     match self {
       Empty => Empty,
-      Leaf(value) => Leaf(f(value)),
+      Leaf(value) => Leaf(Arc::new(f(value))),
       Branch {
         left,
         middle,
@@ -941,7 +979,7 @@ impl<T: Clone + fmt::Display + Eq + PartialEq + fmt::Debug> TernaryTreeList<T> {
     let mut xs = vec![];
 
     // TODO
-    for item in self.to_owned() {
+    for item in &self.to_owned() {
       xs.push(item.to_owned());
     }
 
@@ -950,7 +988,7 @@ impl<T: Clone + fmt::Display + Eq + PartialEq + fmt::Debug> TernaryTreeList<T> {
 }
 
 // pass several children here
-fn decide_parent_depth<T: Clone + fmt::Display + Eq + PartialEq + fmt::Debug>(
+fn decide_parent_depth<T: Clone + Display + Eq + PartialEq + Debug + Ord + PartialOrd + Hash>(
   xs: &[&TernaryTreeList<T>],
 ) -> usize {
   let mut depth = 0;
@@ -964,45 +1002,88 @@ fn decide_parent_depth<T: Clone + fmt::Display + Eq + PartialEq + fmt::Debug>(
   depth + 1
 }
 
-impl<T: Clone + fmt::Display + Eq + PartialEq + fmt::Debug> fmt::Display for TernaryTreeList<T> {
+impl<T: Clone + Display + Eq + PartialEq + Debug + Ord + PartialOrd + Hash> Display
+  for TernaryTreeList<T>
+{
   fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
     write!(f, "TernaryTreeList[{}, ...]", self.len())
   }
 }
 
-impl<T: Clone + fmt::Display + Eq + PartialEq + fmt::Debug> IntoIterator for TernaryTreeList<T> {
-  type Item = T;
-  type IntoIter = TernaryTreeIntoIterator<T>;
+// code to turn `TernaryTreeList<_>` into iterator
+// impl<'a, T: Clone + Display + Eq + PartialEq + Debug + Ord + PartialOrd + Hash> IntoIterator
+//   for TernaryTreeList<T>
+// {
+//   type Item = &'a T;
+//   type IntoIter = TernaryTreeIntoIterator<'a, T>;
+
+//   fn into_iter(self) -> Self::IntoIter {
+//     TernaryTreeIntoIterator {
+//       value: self,
+//       index: 0,
+//     }
+//   }
+// }
+
+// pub struct TernaryTreeIntoIterator<'a, T> {
+//   value: TernaryTreeList<T>,
+//   index: usize,
+// }
+
+// impl<'a, T: Clone + Display + Eq + PartialEq + Debug + Ord + PartialOrd + Hash> Iterator
+//   for TernaryTreeIntoIterator<'a, T>
+// {
+//   type Item = &'a T;
+//   fn next(&mut self) -> Option<Self::Item> {
+//     if self.index < self.value.len() {
+//       let ret = self.value.get(self.index);
+//       self.index += 1;
+//       ret
+//     } else {
+//       None
+//     }
+//   }
+// }
+
+// experimental code to turn `&TernaryTreeList<_>` into iterator
+impl<'a, T: Clone + Display + Eq + PartialEq + Debug + Ord + PartialOrd + Hash> IntoIterator
+  for &'a TernaryTreeList<T>
+{
+  type Item = &'a T;
+  type IntoIter = TernaryTreeRefIntoIterator<'a, T>;
 
   fn into_iter(self) -> Self::IntoIter {
-    TernaryTreeIntoIterator {
+    TernaryTreeRefIntoIterator {
       value: self,
       index: 0,
     }
   }
 }
 
-pub struct TernaryTreeIntoIterator<T> {
-  value: TernaryTreeList<T>,
+pub struct TernaryTreeRefIntoIterator<'a, T> {
+  value: &'a TernaryTreeList<T>,
   index: usize,
 }
 
-impl<T: Clone + fmt::Display + Eq + PartialEq + fmt::Debug> Iterator
-  for TernaryTreeIntoIterator<T>
+impl<'a, T: Clone + Display + Eq + PartialEq + Debug + Ord + PartialOrd + Hash> Iterator
+  for TernaryTreeRefIntoIterator<'a, T>
 {
-  type Item = T;
+  type Item = &'a T;
   fn next(&mut self) -> Option<Self::Item> {
     if self.index < self.value.len() {
-      let ret = self.value.get(self.index);
+      // println!("get: {} {}", self.value.format_inline(), self.index);
+      let ret = self.value.ref_get(self.index);
       self.index += 1;
-      ret
+      Some(ret)
     } else {
       None
     }
   }
 }
 
-impl<T: Clone + fmt::Display + Eq + PartialEq + fmt::Debug> PartialEq for TernaryTreeList<T> {
+impl<T: Clone + Display + Eq + PartialEq + Debug + Ord + PartialOrd + Hash> PartialEq
+  for TernaryTreeList<T>
+{
   fn eq(&self, ys: &Self) -> bool {
     if self.len() != ys.len() {
       return false;
@@ -1017,14 +1098,80 @@ impl<T: Clone + fmt::Display + Eq + PartialEq + fmt::Debug> PartialEq for Ternar
     true
   }
 }
-impl<T: Clone + fmt::Display + Eq + PartialEq + fmt::Debug> Eq for TernaryTreeList<T> {}
 
-fn make_empty_node<T>() -> TernaryTreeList<T> {
-  Empty
+impl<T: Clone + Display + Eq + PartialEq + Debug + Ord + PartialOrd + Hash> Eq
+  for TernaryTreeList<T>
+{
+}
+
+impl<T: Clone + Display + Eq + PartialEq + Debug + Ord + PartialOrd + Hash> PartialOrd
+  for TernaryTreeList<T>
+{
+  fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+    Some(self.cmp(other))
+  }
+}
+
+impl<T: Clone + Display + Eq + PartialEq + Debug + Ord + PartialOrd + Hash> Ord
+  for TernaryTreeList<T>
+{
+  fn cmp(&self, other: &Self) -> Ordering {
+    if self.len() == other.len() {
+      for idx in 0..self.len() {
+        match self.unsafe_get(idx).cmp(&other.unsafe_get(idx)) {
+          Ordering::Equal => {
+            continue;
+          }
+          a => return a,
+        }
+      }
+
+      Ordering::Equal
+    } else {
+      self.len().cmp(&other.len())
+    }
+  }
+}
+
+impl<T: Clone + Display + Eq + PartialEq + Debug + Ord + PartialOrd + Hash> Index<usize>
+  for TernaryTreeList<T>
+{
+  type Output = T;
+
+  fn index<'b>(&self, idx: usize) -> &Self::Output {
+    // println!("get: {} {}", self.format_inline(), idx);
+    self.ref_get(idx)
+  }
+}
+
+impl<T: Clone + Display + Eq + PartialEq + Debug + Ord + PartialOrd + Hash> Hash
+  for TernaryTreeList<T>
+{
+  fn hash<H: Hasher>(&self, state: &mut H) {
+    "ternary".hash(state);
+    match self {
+      Empty => {}
+      Leaf(value) => {
+        "leaf".hash(state);
+        value.hash(state);
+      }
+      Branch {
+        left,
+        middle,
+        right,
+        ..
+      } => {
+        "branch".hash(state);
+        left.hash(state);
+        middle.hash(state);
+        right.hash(state);
+      }
+    }
+  }
 }
 
 /// internal function for mutable writing
-fn write_leaves<T: Clone + fmt::Display + Eq + PartialEq + fmt::Debug>(
+fn write_leaves<T: Clone + Display + Eq + PartialEq + Debug + Ord + PartialOrd + Hash>(
   xs: &TernaryTreeList<T>,
   acc: /* var */ &mut Vec<TernaryTreeList<T>>,
   counter: &RefCell<usize>,

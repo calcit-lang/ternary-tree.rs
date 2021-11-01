@@ -273,7 +273,7 @@ fn iterator() -> Result<(), String> {
   let data4 = TernaryTreeList::from(&origin4);
 
   let mut i = 0;
-  for _ in data4.to_owned() {
+  for _ in &data4.to_owned() {
     i += 1;
   }
 
@@ -342,11 +342,17 @@ fn reverse() -> Result<(), String> {
 fn list_traverse() -> Result<(), String> {
   let mut i = 0;
   let data = TernaryTreeList::from(&[1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
-  for _ in data {
+  for _ in &data {
     i += 1;
   }
 
   assert_eq!(i, 10);
+
+  // makre sure &[_] work
+  let data2 = &TernaryTreeList::from(&[1]);
+  for _ in data2 {
+    i += 1;
+  }
 
   Ok(())
 }
@@ -371,6 +377,16 @@ fn map_values() -> Result<(), String> {
   data3.check_structure()?;
   assert_eq!(data2, data3);
   assert_eq!(data2.format_inline(), data3.format_inline());
+
+  Ok(())
+}
+
+#[test]
+fn index_elem() -> Result<(), String> {
+  let data = TernaryTreeList::from(&[1, 2, 3, 4, 5, 6, 7, 8]);
+
+  assert_eq!(data[0], 1);
+  assert_eq!(&data[0], &1);
 
   Ok(())
 }
