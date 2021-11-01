@@ -989,11 +989,18 @@ impl<'a, T: Clone + Display + Eq + PartialEq + Debug + Ord + PartialOrd + Hash> 
     let mut xs = vec![];
 
     // TODO
-    for item in &self.to_owned() {
+    for item in self {
       xs.push(item.to_owned());
     }
 
     xs
+  }
+
+  pub fn iter(&self) -> TernaryTreeRefIntoIterator<T> {
+    TernaryTreeRefIntoIterator {
+      value: self,
+      index: 0,
+    }
   }
 }
 
@@ -1021,41 +1028,6 @@ impl<T: Clone + Display + Eq + PartialEq + Debug + Ord + PartialOrd + Hash> Disp
     write!(f, "TernaryTreeList[{}, ...]", self.len())
   }
 }
-
-// code to turn `TernaryTreeList<_>` into iterator
-// impl<'a, T: Clone + Display + Eq + PartialEq + Debug + Ord + PartialOrd + Hash> IntoIterator
-//   for TernaryTreeList<T>
-// {
-//   type Item = &'a T;
-//   type IntoIter = TernaryTreeIntoIterator<'a, T>;
-
-//   fn into_iter(self) -> Self::IntoIter {
-//     TernaryTreeIntoIterator {
-//       value: self,
-//       index: 0,
-//     }
-//   }
-// }
-
-// pub struct TernaryTreeIntoIterator<'a, T> {
-//   value: TernaryTreeList<T>,
-//   index: usize,
-// }
-
-// impl<'a, T: Clone + Display + Eq + PartialEq + Debug + Ord + PartialOrd + Hash> Iterator
-//   for TernaryTreeIntoIterator<'a, T>
-// {
-//   type Item = &'a T;
-//   fn next(&mut self) -> Option<Self::Item> {
-//     if self.index < self.value.len() {
-//       let ret = self.value.get(self.index);
-//       self.index += 1;
-//       ret
-//     } else {
-//       None
-//     }
-//   }
-// }
 
 // experimental code to turn `&TernaryTreeList<_>` into iterator
 impl<'a, T: Clone + Display + Eq + PartialEq + Debug + Ord + PartialOrd + Hash> IntoIterator

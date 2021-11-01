@@ -354,6 +354,10 @@ fn list_traverse() -> Result<(), String> {
     i += 1;
   }
 
+  for (idx, _) in data2.iter().enumerate() {
+    i += idx;
+  }
+
   Ok(())
 }
 
