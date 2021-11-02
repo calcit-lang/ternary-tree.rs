@@ -22,7 +22,7 @@ pub fn divide_ternary_sizes(size: usize) -> (usize, usize, usize) {
   (left_size, middle_size, right_size)
 }
 
-pub fn rough_int_pow(x: usize, times: usize) -> usize {
+pub fn rough_int_pow(x: usize, times: u8) -> usize {
   if times < 1 {
     return x;
   }
