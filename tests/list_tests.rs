@@ -105,6 +105,15 @@ fn list_operations() -> Result<(), String> {
 }
 
 #[test]
+fn dissoc() -> Result<(), String> {
+  let data = TernaryTreeList::from(&[0, 1, 2, 3, 4, 5, 6, 7, 8, 9]);
+  assert_eq!(data.format_inline(), "((0 1 2) (3 (4 5 _) 6) (7 8 9))");
+  assert_eq!(data.dissoc(4).format_inline(), "((0 1 2) (3 5 6) (7 8 9))");
+
+  Ok(())
+}
+
+#[test]
 fn list_insertions() -> Result<(), String> {
   let origin5 = vec![1, 2, 3, 4, 5];
   let data5 = TernaryTreeList::from(&origin5);

@@ -472,7 +472,7 @@ impl<'a, T: Clone + Display + Eq + PartialEq + Debug + Ord + PartialOrd + Hash> 
             Branch {
               size: *size - 1,
               depth: decide_parent_depth_3(&changed_branch, middle, right),
-              left: Arc::new(changed_branch.to_owned()),
+              left: Arc::new(changed_branch),
               middle: middle.to_owned(),
               right: right.to_owned(),
             }
@@ -492,7 +492,7 @@ impl<'a, T: Clone + Display + Eq + PartialEq + Debug + Ord + PartialOrd + Hash> 
               size: *size - 1,
               depth: decide_parent_depth_3(left, &changed_branch, right),
               left: left.to_owned(),
-              middle: Arc::new(Empty),
+              middle: Arc::new(changed_branch),
               right: right.to_owned(),
             }
           }
@@ -542,7 +542,7 @@ impl<'a, T: Clone + Display + Eq + PartialEq + Debug + Ord + PartialOrd + Hash> 
   }
   pub fn butlast(&self) -> Self {
     if self.is_empty() {
-      unreachable!("calling rest on empty")
+      unreachable!("calling butlast on empty")
     }
     self.dissoc(self.len() - 1)
   }
@@ -747,7 +747,6 @@ impl<'a, T: Clone + Display + Eq + PartialEq + Debug + Ord + PartialOrd + Hash> 
       } => {
         // echo "Force inplace balancing case list: ", tree.size
         let new_tree = Self::rebuild_list(ys.len(), 0, &ys);
-        // let new_tree = initTernaryTreeList(ys)
         match new_tree {
           Branch {
             left: left2,
