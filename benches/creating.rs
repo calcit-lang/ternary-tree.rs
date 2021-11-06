@@ -1,4 +1,4 @@
-use criterion::{black_box, criterion_group, criterion_main, Criterion};
+use criterion::{criterion_group, criterion_main, Criterion};
 
 use im_ternary_tree::TernaryTreeList;
 
@@ -19,7 +19,7 @@ fn criterion_benchmark(c: &mut Criterion) {
 
       for idx in 0..1000 {
         let pos = idx / 2;
-        data = data.insert(pos, idx, false)
+        data = data.insert(pos, idx, false).unwrap()
       }
     })
   });
@@ -30,7 +30,7 @@ fn criterion_benchmark(c: &mut Criterion) {
 
       for idx in 0..1000 {
         let pos = idx / 2;
-        data = data.insert(pos, idx, true)
+        data = data.insert(pos, idx, true).unwrap()
       }
     })
   });
@@ -40,14 +40,14 @@ fn criterion_benchmark(c: &mut Criterion) {
 
     for idx in 0..1000 {
       let pos = idx / 2;
-      data = data.insert(pos, idx, false)
+      data = data.insert(pos, idx, false).unwrap()
     }
 
     b.iter(move || {
       let mut d = data.to_owned();
 
       while !d.is_empty() {
-        d = d.slice(1, d.len())
+        d = d.slice(1, d.len()).unwrap()
       }
     })
   });
@@ -57,14 +57,14 @@ fn criterion_benchmark(c: &mut Criterion) {
 
     for idx in 0..1000 {
       let pos = idx / 2;
-      data = data.insert(pos, idx, false)
+      data = data.insert(pos, idx, false).unwrap()
     }
 
     b.iter(move || {
       let d = data.to_owned();
 
       for _ in 0..1000 {
-        d.slice(300, 600);
+        d.slice(300, 600).unwrap();
       }
     })
   });
