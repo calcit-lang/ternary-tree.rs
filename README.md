@@ -12,7 +12,7 @@ use im_ternary_tree::TernaryTreeList;
 println!("{}", TernaryTreeList::<usize>::from(&[]));
 
 // assoc
-let origin5 = vec![1, 2, 3, 4, 5];
+let origin5 = [1, 2, 3, 4, 5];
 let data5 = TernaryTreeList::from(&origin5);
 let updated = data5.assoc(3, 10);
 

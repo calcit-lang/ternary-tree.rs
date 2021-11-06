@@ -12,6 +12,7 @@
 //! (((0 1 _) (2 3 4) (5 6 _)) ((7 8 _) (9 10 _) (11 12 _)) ((13 14 _) (15 16 17) (18 19 _)))
 //! ```
 
+mod slice;
 mod util;
 
 use std::cell::RefCell;
@@ -112,14 +113,6 @@ where
         }
       }
     }
-  }
-  pub fn from(xs: &[T]) -> Self {
-    let mut ys: Vec<Self> = Vec::with_capacity(xs.len());
-    for x in xs {
-      ys.push(Leaf(Arc::new((*x).to_owned())))
-    }
-
-    Self::rebuild_list(xs.len(), 0, &ys)
   }
 
   /// turn into a compare representation, with `_` for holes
@@ -888,6 +881,13 @@ where
         Err(format!("Unknown case: {}", self.format_inline()))
       }
     }
+  }
+
+  pub fn skip(&self, idx: usize) -> Result<Self, String> {
+    self.slice(idx, self.len())
+  }
+  pub fn take(&self, idx: usize) -> Result<Self, String> {
+    self.slice(0, idx)
   }
 
   pub fn reverse(&self) -> Self {

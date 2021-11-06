@@ -8,7 +8,7 @@ fn init_list() -> Result<(), String> {
     String::from("TernaryTreeList[4, ...]")
   );
 
-  let origin11 = vec![1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11];
+  let origin11 = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11];
   let data11 = TernaryTreeList::from(&origin11);
 
   data11.check_structure()?;
@@ -21,15 +21,15 @@ fn init_list() -> Result<(), String> {
   // assert_eq!(arrayEqual<number>([...listToItems(data11)], [...indexToItems(data11)]));
 
   let empty_xs: Vec<usize> = vec![];
-  assert_eq!(TernaryTreeList::Empty, TernaryTreeList::from(&empty_xs));
+  assert_eq!(TernaryTreeList::Empty, TernaryTreeList::from(empty_xs));
 
   Ok(())
 }
 
 #[test]
 fn list_operations() -> Result<(), String> {
-  let origin11 = vec![1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11];
-  let data11 = TernaryTreeList::from(&origin11);
+  let origin11 = &[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11];
+  let data11 = TernaryTreeList::from(origin11);
 
   // get
   for (idx, v) in origin11.iter().enumerate() {
@@ -40,8 +40,8 @@ fn list_operations() -> Result<(), String> {
   assert_eq!(data11.last(), Some(11));
 
   // assoc
-  let origin5 = vec![1, 2, 3, 4, 5];
-  let data5 = TernaryTreeList::from(&origin5);
+  let origin5 = &[1, 2, 3, 4, 5];
+  let data5 = TernaryTreeList::from(origin5);
   let updated = data5.assoc(3, 10)?;
   assert_eq!(updated.loop_get(3).unwrap(), 10);
   assert_eq!(data5.loop_get(3).unwrap(), 4);
@@ -85,7 +85,7 @@ fn dissoc() -> Result<(), String> {
 
 #[test]
 fn list_insertions() -> Result<(), String> {
-  let origin5 = vec![1, 2, 3, 4, 5];
+  let origin5 = [1, 2, 3, 4, 5];
   let data5 = TernaryTreeList::from(&origin5);
 
   assert_eq!(data5.format_inline(), "((1 2 _) 3 (4 5 _))");
@@ -191,7 +191,7 @@ fn force_balancing() -> Result<(), String> {
 
 #[test]
 fn iterator() -> Result<(), String> {
-  let origin4 = vec![1, 2, 3, 4];
+  let origin4 = [1, 2, 3, 4];
   let data4 = TernaryTreeList::from(&origin4);
 
   let mut i = 0;
@@ -313,6 +313,16 @@ fn index_elem() -> Result<(), String> {
 
   assert_eq!(data[0], 1);
   assert_eq!(&data[0], &1);
+
+  Ok(())
+}
+
+#[test]
+fn take_skip() -> Result<(), String> {
+  let data = TernaryTreeList::from(&[1, 2, 3, 4, 5, 6, 7, 8]);
+
+  assert_eq!(data.skip(2).unwrap(), TernaryTreeList::from(&[3, 4, 5, 6, 7, 8]));
+  assert_eq!(data.take(2).unwrap(), TernaryTreeList::from(&[1, 2]));
 
   Ok(())
 }
