@@ -1,6 +1,6 @@
 [package]
 name = "im_ternary_tree"
-version = "0.0.1-a6"
+version = "0.0.1-a7"
 edition = "2021"
 authors = ["jiyinyiyong <jiyinyiyong@gmail.com>"]
 license = "MIT"

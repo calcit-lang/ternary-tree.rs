@@ -33,35 +33,16 @@ where
   }
 }
 
-macro_rules! list_from_array {
-  ($size_:expr) => {
-    impl<T> From<&[T; $size_]> for TernaryTreeList<T>
-    where
-      T: Clone + Display + Eq + PartialEq + Debug + Ord + PartialOrd + Hash,
-    {
-      fn from(xs: &[T; $size_]) -> Self {
-        let mut ys: Vec<Self> = Vec::with_capacity(xs.len());
-        for x in xs {
-          ys.push(Leaf(Arc::new((*x).to_owned())))
-        }
-        Self::rebuild_list(xs.len(), 0, &ys)
-      }
+// https://blog.rust-lang.org/2021/02/26/const-generics-mvp-beta.html
+impl<T, const N: usize> From<&[T; N]> for TernaryTreeList<T>
+where
+  T: Clone + Display + Eq + PartialEq + Debug + Ord + PartialOrd + Hash,
+{
+  fn from(xs: &[T; N]) -> Self {
+    let mut ys: Vec<Self> = Vec::with_capacity(xs.len());
+    for x in xs {
+      ys.push(Leaf(Arc::new((*x).to_owned())))
     }
-  };
+    Self::rebuild_list(xs.len(), 0, &ys)
+  }
 }
-
-list_from_array!(0);
-list_from_array!(1);
-list_from_array!(2);
-list_from_array!(3);
-list_from_array!(4);
-list_from_array!(5);
-list_from_array!(6);
-list_from_array!(7);
-list_from_array!(8);
-list_from_array!(9);
-list_from_array!(10);
-list_from_array!(11);
-list_from_array!(12);
-list_from_array!(13);
-list_from_array!(14);
