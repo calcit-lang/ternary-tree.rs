@@ -30,7 +30,13 @@ use util::{divide_ternary_sizes, rough_int_pow};
 pub enum TernaryTreeList<T> {
   Empty,
   Leaf(Arc<T>),
-  Branch {
+  Branch2 {
+    size: usize,
+    depth: u8,
+    left: Arc<TernaryTreeList<T>>,
+    middle: Arc<TernaryTreeList<T>>,
+  },
+  Branch3 {
     size: usize,
     depth: u8,
     left: Arc<TernaryTreeList<T>>,
@@ -50,7 +56,8 @@ where
     match self {
       Empty => 0,
       Leaf { .. } => 0,
-      Branch { depth, .. } => depth.to_owned(),
+      Branch2 { depth, .. } => depth.to_owned(),
+      Branch3 { depth, .. } => depth.to_owned(),
     }
   }
 
@@ -58,7 +65,8 @@ where
     match self {
       Empty => true,
       Leaf { .. } => false,
-      Branch { left, middle, right, .. } => left.is_empty() && middle.is_empty() && right.is_empty(),
+      Branch2 { size, .. } => *size == 0,
+      Branch3 { size, .. } => *size == 0,
     }
   }
 
@@ -66,7 +74,8 @@ where
     match self {
       Empty => 0,
       Leaf { .. } => 1,
-      Branch { size, .. } => size.to_owned(),
+      Branch2 { size, .. } => size.to_owned(),
+      Branch3 { size, .. } => size.to_owned(),
     }
   }
 
@@ -78,11 +87,10 @@ where
       2 => {
         let left = &xs[offset];
         let middle = &xs[offset + 1];
-        Branch {
+        Branch2 {
           size: left.len() + middle.len(),
           left: Arc::new(left.to_owned()),
           middle: Arc::new(middle.to_owned()),
-          right: Arc::new(Empty),
           depth: decide_parent_depth_2(left, middle),
         }
       }
@@ -90,7 +98,7 @@ where
         let left = &xs[offset];
         let middle = &xs[offset + 1];
         let right = &xs[offset + 2];
-        Branch {
+        Branch3 {
           size: left.len() + middle.len() + right.len(),
           left: Arc::new(left.to_owned()),
           middle: Arc::new(middle.to_owned()),
@@ -104,7 +112,7 @@ where
         let left = Self::rebuild_list(divided.0, offset, xs);
         let middle = Self::rebuild_list(divided.1, offset + divided.0, xs);
         let right = Self::rebuild_list(divided.2, offset + divided.0 + divided.1, xs);
-        Branch {
+        Branch3 {
           size: left.len() + middle.len() + right.len(),
           depth: decide_parent_depth_3(&left, &middle, &right),
           left: Arc::new(left),
@@ -120,7 +128,11 @@ where
     match self {
       Empty => String::from("_"),
       Leaf(value) => value.to_string(),
-      Branch { left, middle, right, .. } => {
+      Branch2 { left, middle, .. } => {
+        // TODO maybe need more informations here
+        format!("({} {})", left.format_inline(), middle.format_inline())
+      }
+      Branch3 { left, middle, right, .. } => {
         // TODO maybe need more informations here
         format!("({} {} {})", left.format_inline(), middle.format_inline(), right.format_inline())
       }
@@ -146,7 +158,19 @@ where
         }
       }
 
-      Branch { left, middle, right, .. } => {
+      Branch2 { left, middle, .. } => {
+        if let Some(pos) = left.find_index(f.clone()) {
+          return Some(pos);
+        }
+
+        if let Some(pos) = middle.find_index(f.clone()) {
+          return Some(pos + left.len() as i64);
+        }
+
+        None
+      }
+
+      Branch3 { left, middle, right, .. } => {
         if let Some(pos) = left.find_index(f.clone()) {
           return Some(pos);
         }
@@ -174,7 +198,17 @@ where
           None
         }
       }
-      Branch { left, middle, right, .. } => {
+      Branch2 { left, middle, .. } => {
+        if let Some(pos) = left.index_of(item) {
+          return Some(pos);
+        }
+        if let Some(pos) = middle.index_of(item) {
+          return Some(pos + left.len() as i64);
+        }
+
+        None
+      }
+      Branch3 { left, middle, right, .. } => {
         if let Some(pos) = left.index_of(item) {
           return Some(pos);
         }
@@ -207,8 +241,16 @@ where
     match (self, ys) {
       (Leaf(value), Leaf(v2)) => value == v2,
       (
-        Branch { left, middle, right, .. },
-        Branch {
+        Branch2 { left, middle, .. },
+        Branch2 {
+          left: left2,
+          middle: middle2,
+          ..
+        },
+      ) => left == left2 && middle == middle2,
+      (
+        Branch3 { left, middle, right, .. },
+        Branch3 {
           left: left2,
           middle: middle2,
           right: right2,
@@ -238,7 +280,14 @@ where
     match self {
       Empty => unreachable!("trying to get from empty"),
       Leaf(value) => Some(value),
-      Branch { left, middle, right, .. } => {
+      Branch2 { left, middle, .. } => {
+        if idx < left.len() {
+          left.ref_get(idx)
+        } else {
+          middle.ref_get(idx - left.len())
+        }
+      }
+      Branch3 { left, middle, right, .. } => {
         if idx < left.len() {
           left.ref_get(idx)
         } else if idx < left.len() + middle.len() {
@@ -268,7 +317,24 @@ where
             return None;
           }
         }
-        Branch {
+        Branch2 { left, middle, size, .. } => {
+          if idx > size - 1 {
+            println!("[warning] Index too large at {} from {}", idx, size);
+            return None;
+          }
+
+          if left.len() + middle.len() != size {
+            unreachable!("tree.size does not match sum case branch sizes");
+          }
+
+          if idx < left.len() {
+            tree_parent = (*left).to_owned();
+          } else {
+            tree_parent = (*middle).to_owned();
+            idx -= left.len();
+          }
+        }
+        Branch3 {
           left, middle, right, size, ..
         } => {
           if idx > size - 1 {
@@ -296,19 +362,19 @@ where
     unreachable!("Failed to get ${idx}")
   }
 
-  pub fn first(&self) -> Option<T> {
+  pub fn first(&self) -> Option<&T> {
     if self.is_empty() {
       None
     } else {
-      self.loop_get(0)
+      self.ref_get(0)
     }
   }
 
-  pub fn last(&self) -> Option<T> {
+  pub fn last(&self) -> Option<&T> {
     if self.is_empty() {
       None
     } else {
-      self.loop_get(self.len() - 1)
+      self.ref_get(self.len() - 1)
     }
   }
   pub fn assoc(&self, idx: usize, item: T) -> Result<Self, String> {
@@ -325,7 +391,34 @@ where
           Err(format!("Cannot assoc leaf into index {}", idx))
         }
       }
-      Branch {
+      Branch2 { left, middle, size, .. } => {
+        if left.len() + middle.len() != *size {
+          return Err(format!(
+            "tree size {} does not match sum case branch sizes, {}",
+            size,
+            self.format_inline()
+          ));
+        }
+
+        if idx < left.len() {
+          let changed_branch = left.assoc(idx, item)?;
+          Ok(Branch2 {
+            size: size.to_owned(),
+            depth: decide_parent_depth_2(&changed_branch, middle),
+            left: Arc::new(changed_branch),
+            middle: middle.to_owned(),
+          })
+        } else {
+          let changed_branch = middle.assoc(idx - left.len(), item)?;
+          Ok(Branch2 {
+            size: size.to_owned(),
+            depth: decide_parent_depth_2(left, &changed_branch),
+            left: left.to_owned(),
+            middle: Arc::new(changed_branch),
+          })
+        }
+      }
+      Branch3 {
         left, middle, right, size, ..
       } => {
         if left.len() + middle.len() + right.len() != *size {
@@ -338,7 +431,7 @@ where
 
         if idx < left.len() {
           let changed_branch = left.assoc(idx, item)?;
-          Ok(Branch {
+          Ok(Branch3 {
             size: size.to_owned(),
             depth: decide_parent_depth_3(&changed_branch, middle, right),
             left: Arc::new(changed_branch),
@@ -347,7 +440,7 @@ where
           })
         } else if idx < left.len() + middle.len() {
           let changed_branch = middle.assoc(idx - left.len(), item)?;
-          Ok(Branch {
+          Ok(Branch3 {
             size: size.to_owned(),
             depth: decide_parent_depth_3(left, &changed_branch, right),
             left: left.to_owned(),
@@ -356,7 +449,7 @@ where
           })
         } else {
           let changed_branch = right.assoc(idx - left.len() - middle.len(), item)?;
-          Ok(Branch {
+          Ok(Branch3 {
             size: size.to_owned(),
             depth: decide_parent_depth_3(left, middle, &changed_branch),
             left: left.to_owned(),
@@ -382,7 +475,41 @@ where
     match self {
       Empty => unreachable!("dissoc out of bound"),
       Leaf { .. } => unreachable!("dissoc should be handled at branches"),
-      Branch {
+      Branch2 { left, middle, size, .. } => {
+        if left.len() + middle.len() != *size {
+          return Err(format!(
+            "tree {} does not match sum from branch sizes {}",
+            self.format_inline(),
+            self.len()
+          ));
+        }
+
+        if idx < left.len() {
+          if left.len() == 1 {
+            Ok((**middle).to_owned())
+          } else {
+            let changed_branch = left.dissoc(idx)?;
+            Ok(Branch2 {
+              size: *size - 1,
+              depth: decide_parent_depth_2(&changed_branch, middle),
+              left: Arc::new(changed_branch),
+              middle: middle.to_owned(),
+            })
+          }
+        } else if left.len() == 1 {
+          Ok((**left).to_owned())
+        } else {
+          let changed_branch = middle.dissoc(idx - left.len())?;
+          Ok(Branch2 {
+            size: *size - 1,
+            depth: decide_parent_depth_2(left, &changed_branch),
+            left: left.to_owned(),
+            middle: Arc::new(changed_branch),
+          })
+        }
+      }
+
+      Branch3 {
         left, middle, right, size, ..
       } => {
         if left.len() + middle.len() + right.len() != *size {
@@ -393,79 +520,51 @@ where
           ));
         }
 
-        let result: Self;
-
         if idx < left.len() {
-          let changed_branch = left.dissoc(idx)?;
-          result = if changed_branch.is_empty() {
-            Branch {
+          if left.len() == 1 {
+            Ok(Branch2 {
               size: *size - 1,
               depth: decide_parent_depth_2(middle, right),
               left: middle.to_owned(),
               middle: right.to_owned(),
-              right: Arc::new(Empty),
-            }
+            })
           } else {
-            Branch {
+            let changed_branch = left.dissoc(idx)?;
+            Ok(Branch3 {
               size: *size - 1,
               depth: decide_parent_depth_3(&changed_branch, middle, right),
               left: Arc::new(changed_branch),
               middle: middle.to_owned(),
               right: right.to_owned(),
-            }
+            })
           }
         } else if idx < left.len() + middle.len() {
-          let changed_branch = middle.dissoc(idx - left.len())?;
-          result = if changed_branch.is_empty() {
-            Branch {
+          if middle.len() == 1 {
+            Ok(Branch2 {
               size: *size - 1,
-              depth: decide_parent_depth_3(left, &changed_branch, right),
+              depth: decide_parent_depth_2(left, right),
               left: left.to_owned(),
               middle: right.to_owned(),
-              right: Arc::new(Empty),
-            }
+            })
           } else {
-            Branch {
+            let changed_branch = middle.dissoc(idx - left.len())?;
+            Ok(Branch3 {
               size: *size - 1,
               depth: decide_parent_depth_3(left, &changed_branch, right),
               left: left.to_owned(),
               middle: Arc::new(changed_branch),
               right: right.to_owned(),
-            }
+            })
           }
         } else {
           let changed_branch = right.dissoc(idx - left.len() - middle.len())?;
-          result = Branch {
+          Ok(Branch3 {
             size: *size - 1,
             depth: decide_parent_depth_3(left, middle, &changed_branch),
             left: left.to_owned(),
             middle: middle.to_owned(),
             right: Arc::new(changed_branch.to_owned()),
-          }
-        }
-
-        match &result {
-          Branch {
-            left,
-            middle,
-            right,
-            depth,
-            size,
-          } => {
-            if **middle == Empty {
-              Ok((**left).to_owned())
-            } else {
-              Ok(Branch {
-                left: left.to_owned(),
-                middle: middle.to_owned(),
-                right: right.to_owned(),
-                depth: *depth,
-                size: *size,
-              })
-            }
-          }
-          Empty => Err(format!("unexpected empty from: {}", self.format_inline())),
-          Leaf(..) => Err(format!("should not found leaf: {}", result.format_inline())),
+          })
         }
       }
     }
@@ -500,48 +599,40 @@ where
       }
       Leaf { .. } => {
         if after {
-          Ok(Branch {
+          Ok(Branch2 {
             depth: 1,
             size: 2,
             left: Arc::new(self.to_owned()),
             middle: Arc::new(Leaf(Arc::new(item))),
-            right: Arc::new(Empty),
           })
         } else {
-          Ok(Branch {
+          Ok(Branch2 {
             depth: 1,
             size: 2,
             left: Arc::new(Leaf(Arc::new(item))),
             middle: Arc::new(self.to_owned()),
-            right: Arc::new(Empty),
           })
         }
       }
-      Branch {
-        left,
-        middle,
-        right,
-        size,
-        depth,
-        ..
+
+      Branch2 {
+        left, middle, size, depth, ..
       } => {
         if self.len() == 1 {
           if after {
             // in compact mode, values placed at left
-            return Ok(Branch {
+            return Ok(Branch2 {
               size: 2,
               depth: 1,
               left: left.to_owned(),
               middle: Arc::new(Leaf(Arc::new(item))),
-              right: Arc::new(Empty),
             });
           } else {
-            return Ok(Branch {
+            return Ok(Branch2 {
               size: 2,
               depth: 1,
               left: Arc::new(Leaf(Arc::new(item))),
               middle: left.to_owned(),
-              right: Arc::new(Empty),
             });
           }
         }
@@ -549,7 +640,7 @@ where
         if self.len() == 2 {
           if after {
             if idx == 0 {
-              return Ok(Branch {
+              return Ok(Branch3 {
                 size: 3,
                 depth: 1,
                 left: left.to_owned(),
@@ -558,7 +649,7 @@ where
               });
             }
             if idx == 1 {
-              return Ok(Branch {
+              return Ok(Branch3 {
                 size: 3,
                 depth: 1,
                 left: left.to_owned(),
@@ -569,7 +660,7 @@ where
               return Err(String::from("cannot insert after position 2 since only 2 elements here"));
             }
           } else if idx == 0 {
-            return Ok(Branch {
+            return Ok(Branch3 {
               size: 3,
               depth: 1,
               left: Arc::new(Leaf(Arc::new(item))),
@@ -577,7 +668,122 @@ where
               right: middle.to_owned(),
             });
           } else if idx == 1 {
-            return Ok(Branch {
+            return Ok(Branch3 {
+              size: 3,
+              depth: 1,
+              left: left.to_owned(),
+              middle: Arc::new(Leaf(Arc::new(item))),
+              right: middle.to_owned(),
+            });
+          } else {
+            return Err(String::from("cannot insert before position 2 since only 2 elements here"));
+          }
+        }
+
+        if left.len() + middle.len() != *size {
+          return Err(String::from("tree.size does not match sum case branch sizes"));
+        }
+
+        // echo "picking: ", idx, " ", left.len(), " ", middle.len(), " ", right.len()
+
+        if idx == 0 && !after {
+          return Ok(Branch3 {
+            size: *size + 1,
+            depth: *depth,
+            left: Arc::new(Leaf(Arc::new(item))),
+            middle: left.to_owned(),
+            right: middle.to_owned(),
+          });
+        }
+
+        if idx == *size - 1 && after {
+          return Ok(Branch3 {
+            size: *size + 1,
+            depth: *depth,
+            left: left.to_owned(),
+            middle: middle.to_owned(),
+            right: Arc::new(Leaf(Arc::new(item))),
+          });
+        }
+
+        if idx < left.len() {
+          let changed_branch = left.insert(idx, item, after)?;
+          Ok(Branch2 {
+            size: *size + 1,
+            depth: decide_parent_depth_2(&changed_branch, middle),
+            left: Arc::new(changed_branch.to_owned()),
+            middle: middle.to_owned(),
+          })
+        } else {
+          let changed_branch = middle.insert(idx - left.len(), item, after)?;
+
+          Ok(Branch2 {
+            size: *size + 1,
+            depth: decide_parent_depth_2(left, &changed_branch.to_owned()),
+            left: left.to_owned(),
+            middle: Arc::new(changed_branch.to_owned()),
+          })
+        }
+      }
+      Branch3 {
+        left,
+        middle,
+        right,
+        size,
+        depth,
+        ..
+      } => {
+        if self.len() == 1 {
+          if after {
+            // in compact mode, values placed at left
+            return Ok(Branch2 {
+              size: 2,
+              depth: 1,
+              left: left.to_owned(),
+              middle: Arc::new(Leaf(Arc::new(item))),
+            });
+          } else {
+            return Ok(Branch2 {
+              size: 2,
+              depth: 1,
+              left: Arc::new(Leaf(Arc::new(item))),
+              middle: left.to_owned(),
+            });
+          }
+        }
+
+        if self.len() == 2 {
+          if after {
+            if idx == 0 {
+              return Ok(Branch3 {
+                size: 3,
+                depth: 1,
+                left: left.to_owned(),
+                middle: Arc::new(Leaf(Arc::new(item))),
+                right: middle.to_owned(),
+              });
+            }
+            if idx == 1 {
+              return Ok(Branch3 {
+                size: 3,
+                depth: 1,
+                left: left.to_owned(),
+                middle: middle.to_owned(),
+                right: Arc::new(Leaf(Arc::new(item))),
+              });
+            } else {
+              return Err(String::from("cannot insert after position 2 since only 2 elements here"));
+            }
+          } else if idx == 0 {
+            return Ok(Branch3 {
+              size: 3,
+              depth: 1,
+              left: Arc::new(Leaf(Arc::new(item))),
+              middle: left.to_owned(),
+              right: middle.to_owned(),
+            });
+          } else if idx == 1 {
+            return Ok(Branch3 {
               size: 3,
               depth: 1,
               left: left.to_owned(),
@@ -596,27 +802,25 @@ where
         // echo "picking: ", idx, " ", left.len(), " ", middle.len(), " ", right.len()
 
         if idx == 0 && !after && left.len() >= middle.len() && left.len() >= right.len() {
-          return Ok(Branch {
+          return Ok(Branch2 {
             size: *size + 1,
             depth: depth + 1,
             left: Arc::new(Leaf(Arc::new(item))),
             middle: Arc::new(self.to_owned()),
-            right: Arc::new(Empty),
           });
         }
 
         if idx == *size - 1 && after && right.len() >= middle.len() && right.len() >= left.len() {
-          return Ok(Branch {
+          return Ok(Branch2 {
             size: *size + 1,
             depth: depth + 1,
             left: Arc::new(self.to_owned()),
             middle: Arc::new(Leaf(Arc::new(item))),
-            right: Arc::new(Empty),
           });
         }
 
         if after && idx == *size - 1 && right.len() == 0 && middle.len() >= left.len() {
-          return Ok(Branch {
+          return Ok(Branch3 {
             size: *size + 1,
             depth: depth.to_owned(),
             left: left.to_owned(),
@@ -626,7 +830,7 @@ where
         }
 
         if !after && idx == 0 && right.len() == 0 && middle.len() >= right.len() {
-          return Ok(Branch {
+          return Ok(Branch3 {
             size: *size + 1,
             depth: depth.to_owned(),
             left: Arc::new(Leaf(Arc::new(item))),
@@ -637,7 +841,7 @@ where
 
         if idx < left.len() {
           let changed_branch = left.insert(idx, item, after)?;
-          Ok(Branch {
+          Ok(Branch3 {
             size: *size + 1,
             depth: decide_parent_depth_3(&changed_branch, middle, right),
             left: Arc::new(changed_branch.to_owned()),
@@ -647,7 +851,7 @@ where
         } else if idx < left.len() + middle.len() {
           let changed_branch = middle.insert(idx - left.len(), item, after)?;
 
-          Ok(Branch {
+          Ok(Branch3 {
             size: *size + 1,
             depth: decide_parent_depth_3(left, &changed_branch.to_owned(), right),
             left: left.to_owned(),
@@ -657,7 +861,7 @@ where
         } else {
           let changed_branch = right.insert(idx - left.len() - middle.len(), item, after)?;
 
-          Ok(Branch {
+          Ok(Branch3 {
             size: *size + 1,
             depth: decide_parent_depth_3(left, middle, &changed_branch),
             left: left.to_owned(),
@@ -677,43 +881,16 @@ where
   // this function mutates original tree to make it more balanced
   pub fn force_inplace_balancing(&mut self) -> Result<(), String> {
     let ys = self.to_leaves();
-    match self {
-      Empty => Ok(()),
-      Leaf { .. } => Ok(()),
-      Branch {
-        ref mut left,
-        ref mut middle,
-        ref mut right,
-        ref mut depth,
-        ..
-      } => {
-        // echo "Force inplace balancing case list: ", tree.size
-        let new_tree = Self::rebuild_list(ys.len(), 0, &ys);
-        match new_tree {
-          Branch {
-            left: left2,
-            middle: middle2,
-            right: right2,
-            ..
-          } => {
-            *left = left2.to_owned();
-            *middle = middle2.to_owned();
-            *right = right2.to_owned();
-            *depth = decide_parent_depth_3(&left2, &middle2, &right2);
-            Ok(())
-          }
-          Empty => Err(String::from("expected some data")),
-          Leaf { .. } => Err(String::from("expected leaf data")),
-        }
-      }
-    }
+    *self = Self::rebuild_list(ys.len(), 0, &ys);
+    Ok(())
   }
   // TODO, need better strategy for detecting
   pub fn maybe_reblance(&mut self) -> Result<(), String> {
     match self {
       Empty => Ok(()),
       Leaf(..) => Ok(()),
-      Branch { size, .. } => {
+      Branch2 { .. } => Ok(()),
+      Branch3 { size, .. } => {
         // guessed number
         if *size < 81 {
           Ok(())
@@ -789,7 +966,25 @@ where
       match self {
         Empty => Ok(()),
         Leaf { .. } => Ok(()),
-        Branch {
+        Branch2 { left, middle, size, depth } => {
+          if !self.is_empty() && *size == 0 {
+            return Err(String::from("branch but has size"));
+          }
+
+          if *size != left.len() + middle.len() {
+            return Err(format!("Bad size at branch {}", self.format_inline()));
+          }
+
+          if *depth != decide_parent_depth_2(left, middle) {
+            return Err(format!("Bad depth at branch {}", self.format_inline()));
+          }
+
+          left.check_structure()?;
+          middle.check_structure()?;
+
+          Ok(())
+        }
+        Branch3 {
           left,
           middle,
           right,
@@ -839,7 +1034,31 @@ where
           Err(format!("Invalid slice range for a leaf: {} {}", start_idx, end_idx))
         }
       }
-      Branch { left, right, middle, .. } => {
+
+      Branch2 { left, middle, .. } => {
+        if start_idx == 0 && end_idx == self.len() {
+          return Ok(self.to_owned());
+        }
+
+        // echo "sizes: {left.len()} {middle.len()} {right.len()}"
+
+        if start_idx >= left.len() {
+          return middle.slice(start_idx - left.len(), end_idx - left.len());
+        }
+
+        if end_idx <= left.len() {
+          return left.slice(start_idx, end_idx);
+        }
+
+        if end_idx <= left.len() + middle.len() {
+          let left_cut = left.slice(start_idx, left.len());
+          let middle_cut = middle.slice(0, end_idx - left.len());
+          return Ok(Self::concat(&[left_cut?, middle_cut?]));
+        }
+
+        Err(format!("Unknown case: {}", self.format_inline()))
+      }
+      Branch3 { left, right, middle, .. } => {
         if start_idx == 0 && end_idx == self.len() {
           return Ok(self.to_owned());
         }
@@ -898,13 +1117,19 @@ where
     match self {
       Empty => Empty,
       Leaf { .. } => self.to_owned(),
-      Branch {
+      Branch2 { left, middle, size, depth } => Branch2 {
+        size: *size,
+        depth: *depth,
+        left: Arc::new(middle.reverse()),
+        middle: Arc::new(left.reverse()),
+      },
+      Branch3 {
         left,
         middle,
         right,
         size,
         depth,
-      } => Branch {
+      } => Branch3 {
         size: *size,
         depth: *depth,
         left: Arc::new(right.reverse()),
@@ -917,13 +1142,19 @@ where
     match self {
       Empty => Empty,
       Leaf(value) => Leaf(Arc::new(f(value))),
-      Branch {
+      Branch2 { left, middle, size, depth } => Branch2 {
+        size: *size,
+        depth: *depth,
+        left: Arc::new(left.map(f.clone())),
+        middle: Arc::new(middle.map(f.clone())),
+      },
+      Branch3 {
         left,
         middle,
         right,
         size,
         depth,
-      } => Branch {
+      } => Branch3 {
         size: *size,
         depth: *depth,
         left: Arc::new(left.map(f.clone())),
@@ -1017,7 +1248,7 @@ impl<T: Clone + Display + Eq + PartialEq + Debug + Ord + PartialOrd + Hash> Part
     }
 
     for idx in 0..ys.len() {
-      if self.loop_get(idx) != ys.loop_get(idx) {
+      if self.ref_get(idx) != ys.ref_get(idx) {
         return false;
       }
     }
@@ -1044,7 +1275,7 @@ where
   fn cmp(&self, other: &Self) -> Ordering {
     if self.len() == other.len() {
       for idx in 0..self.len() {
-        match self.loop_get(idx).cmp(&other.loop_get(idx)) {
+        match self.ref_get(idx).cmp(&other.ref_get(idx)) {
           Ordering::Equal => {}
           a => return a,
         }
@@ -1081,7 +1312,12 @@ where
         "leaf".hash(state);
         value.hash(state);
       }
-      Branch { left, middle, right, .. } => {
+      Branch2 { left, middle, .. } => {
+        "branch".hash(state);
+        left.hash(state);
+        middle.hash(state);
+      }
+      Branch3 { left, middle, right, .. } => {
         "branch".hash(state);
         left.hash(state);
         middle.hash(state);
@@ -1108,7 +1344,11 @@ where
 
       counter.replace(idx + 1);
     }
-    Branch { left, middle, right, .. } => {
+    Branch2 { left, middle, .. } => {
+      write_leaves(left, acc, counter);
+      write_leaves(middle, acc, counter);
+    }
+    Branch3 { left, middle, right, .. } => {
       write_leaves(left, acc, counter);
       write_leaves(middle, acc, counter);
       write_leaves(right, acc, counter);

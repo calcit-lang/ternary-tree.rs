@@ -25,3 +25,5 @@ criterion = "0.3"
 name = "creating"
 harness = false
 
+[profile.release]
+debug = true

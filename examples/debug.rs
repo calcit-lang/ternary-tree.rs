@@ -14,20 +14,27 @@ pub fn main() -> Result<(), String> {
   // assert_eq!(updated.loop_get(3).unwrap(), &10);
 
   let mut data: Vec<usize> = vec![];
-  for idx in 0..10000 {
+  for idx in 0..100000 {
     data.push(idx)
   }
   let tree = TernaryTreeList::from(&data);
 
-  for _ in 0..100 {
-    for idx in 0..1000 {
-      let _ = tree.loop_get(idx);
-    }
-  }
+  // for _ in 0..1000 {
+  //   for idx in 0..1000 {
+  //     let _ = tree.loop_get(idx);
+  //   }
+  // }
 
-  for _ in 0..100 {
-    for idx in 0..1000 {
-      let _ = tree.ref_get(idx);
+  // for _ in 0..1000 {
+  //   for idx in 0..1000 {
+  //     let _ = tree.ref_get(idx);
+  //   }
+  // }
+
+  for _ in 0..1000 {
+    let mut data = tree.to_owned();
+    for _ in 0..1000 {
+      data = data.rest().unwrap();
     }
   }
 
