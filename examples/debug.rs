@@ -13,11 +13,11 @@ pub fn main() -> Result<(), String> {
 
   // assert_eq!(updated.loop_get(3).unwrap(), &10);
 
-  let mut data: Vec<usize> = vec![];
-  for idx in 0..100000 {
-    data.push(idx)
-  }
-  let tree = TernaryTreeList::from(&data);
+  // let mut data: Vec<usize> = vec![];
+  // for idx in 0..100000 {
+  //   data.push(idx)
+  // }
+  // let tree = TernaryTreeList::from(&data);
 
   // for _ in 0..1000 {
   //   for idx in 0..1000 {
@@ -31,10 +31,17 @@ pub fn main() -> Result<(), String> {
   //   }
   // }
 
-  for _ in 0..1000 {
-    let mut data = tree.to_owned();
-    for _ in 0..1000 {
-      data = data.rest().unwrap();
+  // for _ in 0..1000 {
+  //   let mut data = tree.to_owned();
+  //   for _ in 0..1000 {
+  //     data = data.rest().unwrap();
+  //   }
+  // }
+
+  for _ in 0..10 {
+    let mut data: TernaryTreeList<usize> = TernaryTreeList::Empty;
+    for idx in 0..10000 {
+      data = data.push(idx);
     }
   }
 

@@ -67,8 +67,8 @@ fn list_operations() -> Result<(), String> {
 
   assert_eq!(TernaryTreeList::from(&[1]).butlast()?.format_inline(), "_");
   assert_eq!(TernaryTreeList::from(&[1, 2]).butlast()?.format_inline(), "1");
-  assert_eq!(TernaryTreeList::from(&[1, 2, 3]).butlast()?.format_inline(), "(1 2 _)");
-  assert_eq!(TernaryTreeList::from(&[1, 2, 3, 4]).butlast()?.format_inline(), "(1 (2 3) _)");
+  assert_eq!(TernaryTreeList::from(&[1, 2, 3]).butlast()?.format_inline(), "(1 2)");
+  assert_eq!(TernaryTreeList::from(&[1, 2, 3, 4]).butlast()?.format_inline(), "(1 (2 3))");
   assert_eq!(TernaryTreeList::from(&[1, 2, 3, 4, 5]).butlast()?.format_inline(), "((1 2) 3 4)");
 
   Ok(())

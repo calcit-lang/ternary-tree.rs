@@ -187,8 +187,8 @@ where
       }
     }
   }
-  // returns -1 if (not foun)
-  pub fn index_of(&self, item: &T) -> Option<i64> {
+
+  pub fn index_of(&self, item: &T) -> Option<usize> {
     match self {
       Empty => None,
       Leaf(value) => {
@@ -200,26 +200,19 @@ where
       }
       Branch2 { left, middle, .. } => {
         if let Some(pos) = left.index_of(item) {
-          return Some(pos);
+          Some(pos)
+        } else {
+          middle.index_of(item).map(|pos| pos + left.len())
         }
-        if let Some(pos) = middle.index_of(item) {
-          return Some(pos + left.len() as i64);
-        }
-
-        None
       }
       Branch3 { left, middle, right, .. } => {
         if let Some(pos) = left.index_of(item) {
-          return Some(pos);
+          Some(pos)
+        } else if let Some(pos) = middle.index_of(item) {
+          Some(pos + left.len())
+        } else {
+          right.index_of(item).map(|pos| pos + left.len() + middle.len())
         }
-        if let Some(pos) = middle.index_of(item) {
-          return Some(pos + left.len() as i64);
-        }
-        if let Some(pos) = right.index_of(item) {
-          return Some(pos + left.len() as i64 + middle.len() as i64);
-        }
-
-        None
       }
     }
   }
@@ -247,7 +240,7 @@ where
           middle: middle2,
           ..
         },
-      ) => left == left2 && middle == middle2,
+      ) => left.is_shape_same(left2) && middle.is_shape_same(middle2),
       (
         Branch3 { left, middle, right, .. },
         Branch3 {
@@ -256,7 +249,7 @@ where
           right: right2,
           ..
         },
-      ) => left == left2 && middle == middle2 && right == right2,
+      ) => left.is_shape_same(left2) && middle.is_shape_same(middle2) && right.is_shape_same(right2),
 
       (_, _) => false,
     }
@@ -273,12 +266,12 @@ where
 
   pub fn ref_get(&self, idx: usize) -> Option<&T> {
     // println!("get: {} {}", self.format_inline(), idx);
-    if idx >= self.len() {
-      println!("get from out of bound: {} {}", idx, self.len());
-      return None;
-    }
+    // if idx >= self.len() {
+    //   println!("get from out of bound: {} {}", idx, self.len());
+    //   return None;
+    // }
     match self {
-      Empty => unreachable!("trying to get from empty"),
+      Empty => unreachable!("out of bound, trying to get from empty"),
       Leaf(value) => Some(value),
       Branch2 { left, middle, .. } => {
         if idx < left.len() {
@@ -556,6 +549,13 @@ where
               right: right.to_owned(),
             })
           }
+        } else if right.len() == 1 {
+          Ok(Branch2 {
+            size: *size - 1,
+            depth: decide_parent_depth_2(left, middle),
+            left: left.to_owned(),
+            middle: middle.to_owned(),
+          })
         } else {
           let changed_branch = right.dissoc(idx - left.len() - middle.len())?;
           Ok(Branch3 {
@@ -946,18 +946,52 @@ where
     }
     result
   }
-  pub fn concat(xs_groups: &[TernaryTreeList<T>]) -> Self {
-    let mut ys: Vec<TernaryTreeList<T>> = vec![];
-    for x in xs_groups {
+  pub fn concat(raw: &[TernaryTreeList<T>]) -> Self {
+    let mut xs_groups: Vec<TernaryTreeList<T>> = Vec::with_capacity(raw.len());
+    for x in raw {
       if !x.is_empty() {
-        ys.push(x.to_owned())
+        xs_groups.push(x.to_owned());
       }
     }
-    let mut result = Self::rebuild_list(ys.len(), 0, &ys);
-    if let Err(msg) = result.maybe_reblance() {
-      println!("[warning] {}", msg)
+    match xs_groups.len() {
+      0 => TernaryTreeList::Empty,
+      1 => xs_groups[0].to_owned(),
+      2 => {
+        let left = xs_groups[0].to_owned();
+        let middle = xs_groups[1].to_owned();
+        TernaryTreeList::Branch2 {
+          size: left.len() + middle.len(),
+          depth: decide_parent_depth_2(&left, &middle),
+          left: Arc::new(left),
+          middle: Arc::new(middle),
+        }
+      }
+      3 => {
+        let left = xs_groups[0].to_owned();
+        let middle = xs_groups[1].to_owned();
+        let right = xs_groups[2].to_owned();
+        TernaryTreeList::Branch3 {
+          size: left.len() + middle.len() + right.len(),
+          depth: decide_parent_depth_3(&left, &middle, &right),
+          left: Arc::new(left),
+          middle: Arc::new(middle),
+          right: Arc::new(right),
+        }
+      }
+      _ => {
+        let mut ys: Vec<TernaryTreeList<T>> = vec![];
+        for x in xs_groups {
+          if !x.is_empty() {
+            ys.push(x.to_owned())
+          }
+        }
+        let mut result = Self::rebuild_list(ys.len(), 0, &ys);
+        if let Err(msg) = result.maybe_reblance() {
+          println!("[warning] {}", msg)
+        }
+        result
+      }
     }
-    result
   }
   pub fn check_structure(&self) -> Result<(), String> {
     if self.is_empty() {
@@ -1037,67 +1071,68 @@ where
 
       Branch2 { left, middle, .. } => {
         if start_idx == 0 && end_idx == self.len() {
-          return Ok(self.to_owned());
+          Ok(self.to_owned())
+        } else if start_idx >= left.len() {
+          // echo "sizes: {left.len()} {middle.len()} {right.len()}"
+          middle.slice(start_idx - left.len(), end_idx - left.len())
+        } else if end_idx <= left.len() {
+          left.slice(start_idx, end_idx)
+        } else {
+          let left_cut = left.slice(start_idx, left.len())?;
+          let middle_cut = middle.slice(0, end_idx - left.len())?;
+
+          Ok(TernaryTreeList::Branch2 {
+            size: left_cut.len() + middle_cut.len(),
+            depth: decide_parent_depth_2(&left_cut, &middle_cut),
+            left: Arc::new(left_cut),
+            middle: Arc::new(middle_cut),
+          })
         }
-
-        // echo "sizes: {left.len()} {middle.len()} {right.len()}"
-
-        if start_idx >= left.len() {
-          return middle.slice(start_idx - left.len(), end_idx - left.len());
-        }
-
-        if end_idx <= left.len() {
-          return left.slice(start_idx, end_idx);
-        }
-
-        if end_idx <= left.len() + middle.len() {
-          let left_cut = left.slice(start_idx, left.len());
-          let middle_cut = middle.slice(0, end_idx - left.len());
-          return Ok(Self::concat(&[left_cut?, middle_cut?]));
-        }
-
-        Err(format!("Unknown case: {}", self.format_inline()))
       }
       Branch3 { left, right, middle, .. } => {
+        let base1 = left.len();
+        let base2 = base1 + middle.len();
         if start_idx == 0 && end_idx == self.len() {
-          return Ok(self.to_owned());
-        }
-
-        // echo "sizes: {left.len()} {middle.len()} {right.len()}"
-
-        if start_idx >= left.len() + middle.len() {
-          return right.slice(start_idx - left.len() - middle.len(), end_idx - left.len() - middle.len());
-        }
-        if start_idx >= left.len() {
-          if end_idx <= left.len() + middle.len() {
-            return middle.slice(start_idx - left.len(), end_idx - left.len());
+          Ok(self.to_owned())
+        } else if start_idx >= base2 {
+          right.slice(start_idx - base2, end_idx - base2)
+        } else if start_idx >= base1 {
+          if end_idx <= base1 + middle.len() {
+            middle.slice(start_idx - base1, end_idx - base1)
           } else {
-            let middle_cut = middle.slice(start_idx - left.len(), middle.len())?;
-            let right_cut = right.slice(0, end_idx - left.len() - middle.len())?;
-            return Ok(Self::concat(&[middle_cut, right_cut]));
+            let middle_cut = middle.slice(start_idx - base1, middle.len())?;
+            let right_cut = right.slice(0, end_idx - base2)?;
+
+            Ok(TernaryTreeList::Branch2 {
+              size: middle_cut.len() + right_cut.len(),
+              depth: decide_parent_depth_2(&middle_cut, &right_cut),
+              left: Arc::new(middle_cut),
+              middle: Arc::new(right_cut),
+            })
           }
-        }
+        } else if end_idx <= base1 {
+          left.slice(start_idx, end_idx)
+        } else if end_idx <= base2 {
+          let left_cut = left.slice(start_idx, base1)?;
+          let middle_cut = middle.slice(0, end_idx - base1)?;
 
-        if end_idx <= left.len() {
-          return left.slice(start_idx, end_idx);
+          Ok(TernaryTreeList::Branch2 {
+            size: left_cut.len() + middle_cut.len(),
+            depth: decide_parent_depth_2(&left_cut, &middle_cut),
+            left: Arc::new(left_cut),
+            middle: Arc::new(middle_cut),
+          })
+        } else {
+          let left_cut = left.slice(start_idx, base1)?;
+          let right_cut = right.slice(0, end_idx - base2)?;
+          Ok(TernaryTreeList::Branch3 {
+            size: left_cut.len() + middle.len() + right_cut.len(),
+            depth: decide_parent_depth_3(&left_cut, middle, &right_cut),
+            left: Arc::new(left_cut),
+            middle: middle.clone(),
+            right: Arc::new(right_cut),
+          })
         }
-
-        if end_idx <= left.len() + middle.len() {
-          let left_cut = left.slice(start_idx, left.len());
-          let middle_cut = middle.slice(0, end_idx - left.len());
-          return Ok(Self::concat(&[left_cut?, middle_cut?]));
-        }
-
-        if end_idx <= left.len() + middle.len() + right.len() {
-          let left_cut = left.slice(start_idx, left.len());
-          let right_cut = right.slice(0, end_idx - left.len() - middle.len());
-          match &**middle {
-            Empty => return Ok(Self::concat(&[left_cut?, right_cut?])),
-            _ => return Ok(Self::concat(&[left_cut?, (**middle).to_owned(), right_cut?])),
-          }
-        }
-
-        Err(format!("Unknown case: {}", self.format_inline()))
       }
     }
   }
