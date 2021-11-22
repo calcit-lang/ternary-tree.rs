@@ -68,6 +68,62 @@ fn criterion_benchmark(c: &mut Criterion) {
       }
     })
   });
+
+  c.bench_function("index", |b| {
+    let mut data = TernaryTreeList::Empty;
+
+    for idx in 0..1000 {
+      data = data.push(idx)
+    }
+
+    b.iter(|| {
+      for idx in 0..1000 {
+        let _ = data[idx];
+      }
+    })
+  });
+
+  c.bench_function("get", |b| {
+    let mut data = TernaryTreeList::Empty;
+
+    for idx in 0..1000 {
+      data = data.push(idx)
+    }
+
+    b.iter(|| {
+      for idx in 0..1000 {
+        let _ = data.get(idx);
+      }
+    })
+  });
+
+  c.bench_function("loop_get", |b| {
+    let mut data = TernaryTreeList::Empty;
+
+    for idx in 0..1000 {
+      data = data.push(idx)
+    }
+
+    b.iter(|| {
+      for idx in 0..1000 {
+        let _ = data.loop_get(idx);
+      }
+    })
+  });
+
+  c.bench_function("ref_get", |b| {
+    let mut data = TernaryTreeList::Empty;
+
+    for idx in 0..1000 {
+      data = data.push(idx)
+    }
+
+    b.iter(|| {
+      for idx in 0..1000 {
+        let _ = data.ref_get(idx).to_owned();
+      }
+    })
+  });
 }
 
 criterion_group!(benches, criterion_benchmark);

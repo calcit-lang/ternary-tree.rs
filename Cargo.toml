@@ -1,6 +1,6 @@
 [package]
 name = "im_ternary_tree"
-version = "0.0.1-a7"
+version = "0.0.1-a8"
 edition = "2021"
 authors = ["jiyinyiyong <jiyinyiyong@gmail.com>"]
 license = "MIT"
@@ -25,3 +25,5 @@ criterion = "0.3"
 name = "creating"
 harness = false
 
+[profile.release]
+debug = true

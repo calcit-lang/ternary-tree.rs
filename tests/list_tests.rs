@@ -13,7 +13,7 @@ fn init_list() -> Result<(), String> {
 
   data11.check_structure()?;
 
-  assert_eq!(data11.format_inline(), String::from("((1 (2 3 _) 4) (5 6 7) (8 (9 10 _) 11))"));
+  assert_eq!(data11.format_inline(), String::from("((1 (2 3) 4) (5 6 7) (8 (9 10) 11))"));
   // assert_eq!(
   //   origin11, [...listToItems(data11)],
   // );
@@ -33,11 +33,11 @@ fn list_operations() -> Result<(), String> {
 
   // get
   for (idx, v) in origin11.iter().enumerate() {
-    assert_eq!(v, &data11.loop_get(idx).unwrap());
+    assert_eq!(*v, data11.loop_get(idx).unwrap());
   }
 
-  assert_eq!(data11.first(), Some(1));
-  assert_eq!(data11.last(), Some(11));
+  assert_eq!(data11.first(), Some(&1));
+  assert_eq!(data11.last(), Some(&11));
 
   // assoc
   let origin5 = &[1, 2, 3, 4, 5];
@@ -52,24 +52,24 @@ fn list_operations() -> Result<(), String> {
     assert_eq!(data5.dissoc(idx)?.len(), data5.len() - 1);
   }
 
-  assert_eq!(data5.format_inline(), "((1 2 _) 3 (4 5 _))");
-  assert_eq!(data5.dissoc(0)?.format_inline(), "(2 3 (4 5 _))");
-  assert_eq!(data5.dissoc(1)?.format_inline(), "(1 3 (4 5 _))");
-  assert_eq!(data5.dissoc(2)?.format_inline(), "((1 2 _) (4 5 _) _)");
-  assert_eq!(data5.dissoc(3)?.format_inline(), "((1 2 _) 3 5)");
-  assert_eq!(data5.dissoc(4)?.format_inline(), "((1 2 _) 3 4)");
+  assert_eq!(data5.format_inline(), "((1 2) 3 (4 5))");
+  assert_eq!(data5.dissoc(0)?.format_inline(), "(2 3 (4 5))");
+  assert_eq!(data5.dissoc(1)?.format_inline(), "(1 3 (4 5))");
+  assert_eq!(data5.dissoc(2)?.format_inline(), "((1 2) (4 5))");
+  assert_eq!(data5.dissoc(3)?.format_inline(), "((1 2) 3 5)");
+  assert_eq!(data5.dissoc(4)?.format_inline(), "((1 2) 3 4)");
 
   assert_eq!(TernaryTreeList::from(&[1]).rest()?.format_inline(), "_");
   assert_eq!(TernaryTreeList::from(&[1, 2]).rest()?.format_inline(), "2");
-  assert_eq!(TernaryTreeList::from(&[1, 2, 3]).rest()?.format_inline(), "(2 3 _)");
-  assert_eq!(TernaryTreeList::from(&[1, 2, 3, 4]).rest()?.format_inline(), "((2 3 _) 4 _)");
-  assert_eq!(TernaryTreeList::from(&[1, 2, 3, 4, 5]).rest()?.format_inline(), "(2 3 (4 5 _))");
+  assert_eq!(TernaryTreeList::from(&[1, 2, 3]).rest()?.format_inline(), "(2 3)");
+  assert_eq!(TernaryTreeList::from(&[1, 2, 3, 4]).rest()?.format_inline(), "((2 3) 4)");
+  assert_eq!(TernaryTreeList::from(&[1, 2, 3, 4, 5]).rest()?.format_inline(), "(2 3 (4 5))");
 
   assert_eq!(TernaryTreeList::from(&[1]).butlast()?.format_inline(), "_");
   assert_eq!(TernaryTreeList::from(&[1, 2]).butlast()?.format_inline(), "1");
-  assert_eq!(TernaryTreeList::from(&[1, 2, 3]).butlast()?.format_inline(), "(1 2 _)");
-  assert_eq!(TernaryTreeList::from(&[1, 2, 3, 4]).butlast()?.format_inline(), "(1 (2 3 _) _)");
-  assert_eq!(TernaryTreeList::from(&[1, 2, 3, 4, 5]).butlast()?.format_inline(), "((1 2 _) 3 4)");
+  assert_eq!(TernaryTreeList::from(&[1, 2, 3]).butlast()?.format_inline(), "(1 2)");
+  assert_eq!(TernaryTreeList::from(&[1, 2, 3, 4]).butlast()?.format_inline(), "(1 (2 3))");
+  assert_eq!(TernaryTreeList::from(&[1, 2, 3, 4, 5]).butlast()?.format_inline(), "((1 2) 3 4)");
 
   Ok(())
 }
@@ -77,7 +77,7 @@ fn list_operations() -> Result<(), String> {
 #[test]
 fn dissoc() -> Result<(), String> {
   let data = TernaryTreeList::from(&[0, 1, 2, 3, 4, 5, 6, 7, 8, 9]);
-  assert_eq!(data.format_inline(), "((0 1 2) (3 (4 5 _) 6) (7 8 9))");
+  assert_eq!(data.format_inline(), "((0 1 2) (3 (4 5) 6) (7 8 9))");
   assert_eq!(data.dissoc(4)?.format_inline(), "((0 1 2) (3 5 6) (7 8 9))");
 
   Ok(())
@@ -88,27 +88,27 @@ fn list_insertions() -> Result<(), String> {
   let origin5 = [1, 2, 3, 4, 5];
   let data5 = TernaryTreeList::from(&origin5);
 
-  assert_eq!(data5.format_inline(), "((1 2 _) 3 (4 5 _))");
+  assert_eq!(data5.format_inline(), "((1 2) 3 (4 5))");
 
-  assert_eq!(data5.insert(0, 10, false)?.format_inline(), "(10 ((1 2 _) 3 (4 5 _)) _)");
-  assert_eq!(data5.insert(0, 10, true)?.format_inline(), "((1 10 2) 3 (4 5 _))");
-  assert_eq!(data5.insert(1, 10, false)?.format_inline(), "((1 10 2) 3 (4 5 _))");
-  assert_eq!(data5.insert(1, 10, true)?.format_inline(), "((1 2 10) 3 (4 5 _))");
-  assert_eq!(data5.insert(2, 10, false)?.format_inline(), "((1 2 _) (10 3 _) (4 5 _))");
-  assert_eq!(data5.insert(2, 10, true)?.format_inline(), "((1 2 _) (3 10 _) (4 5 _))");
-  assert_eq!(data5.insert(3, 10, false)?.format_inline(), "((1 2 _) 3 (10 4 5))");
-  assert_eq!(data5.insert(3, 10, true)?.format_inline(), "((1 2 _) 3 (4 10 5))");
-  assert_eq!(data5.insert(4, 10, false)?.format_inline(), "((1 2 _) 3 (4 10 5))");
-  assert_eq!(data5.insert(4, 10, true)?.format_inline(), "(((1 2 _) 3 (4 5 _)) 10 _)");
+  assert_eq!(data5.insert(0, 10, false)?.format_inline(), "(10 ((1 2) 3 (4 5)))");
+  assert_eq!(data5.insert(0, 10, true)?.format_inline(), "((1 10 2) 3 (4 5))");
+  assert_eq!(data5.insert(1, 10, false)?.format_inline(), "((1 10 2) 3 (4 5))");
+  assert_eq!(data5.insert(1, 10, true)?.format_inline(), "((1 2 10) 3 (4 5))");
+  assert_eq!(data5.insert(2, 10, false)?.format_inline(), "((1 2) (10 3) (4 5))");
+  assert_eq!(data5.insert(2, 10, true)?.format_inline(), "((1 2) (3 10) (4 5))");
+  assert_eq!(data5.insert(3, 10, false)?.format_inline(), "((1 2) 3 (10 4 5))");
+  assert_eq!(data5.insert(3, 10, true)?.format_inline(), "((1 2) 3 (4 10 5))");
+  assert_eq!(data5.insert(4, 10, false)?.format_inline(), "((1 2) 3 (4 10 5))");
+  assert_eq!(data5.insert(4, 10, true)?.format_inline(), "(((1 2) 3 (4 5)) 10)");
 
   let origin4 = [1, 2, 3, 4];
   let data4 = TernaryTreeList::from(&origin4);
 
-  assert_eq!(data4.assoc_before(3, 10)?.format_inline(), "(1 (2 3 _) (10 4 _))");
-  assert_eq!(data4.assoc_after(3, 10)?.format_inline(), "(1 (2 3 _) (4 10 _))");
+  assert_eq!(data4.assoc_before(3, 10)?.format_inline(), "(1 (2 3) (10 4))");
+  assert_eq!(data4.assoc_after(3, 10)?.format_inline(), "(1 (2 3) (4 10))");
 
-  assert_eq!(data4.prepend(10, false).format_inline(), "((10 1 _) (2 3 _) 4)");
-  assert_eq!(data4.append(10, false).format_inline(), "(1 (2 3 _) (4 10 _))");
+  assert_eq!(data4.prepend(10, false).format_inline(), "((10 1) (2 3) 4)");
+  assert_eq!(data4.append(10, false).format_inline(), "(1 (2 3) (4 10))");
 
   Ok(())
 }
@@ -123,19 +123,19 @@ fn test_concat() -> Result<(), String> {
 
   assert_eq!(
     TernaryTreeList::concat(&[data1.to_owned(), data2.to_owned()]).format_inline(),
-    "((1 2 _) (3 4 _) _)"
+    "((1 2) (3 4))"
   );
   assert_eq!(
     TernaryTreeList::concat(&[TernaryTreeList::from(&[]), data1.to_owned()]).format_inline(),
-    "(1 2 _)"
+    "(1 2)"
   );
   assert_eq!(
     TernaryTreeList::concat(&[data1.to_owned(), data2.to_owned(), data3.to_owned()]).format_inline(),
-    "((1 2 _) (3 4 _) (5 6 _))"
+    "((1 2) (3 4) (5 6))"
   );
   assert_eq!(
     TernaryTreeList::concat(&[data1.to_owned(), data2.to_owned(), data3.to_owned(), data4.to_owned()]).format_inline(),
-    "((1 2 _) ((3 4 _) (5 6 _) _) (7 8 _))"
+    "((1 2) ((3 4) (5 6)) (7 8))"
   );
 
   TernaryTreeList::concat(&[data1.to_owned(), data2.to_owned()]).check_structure()?;
@@ -175,14 +175,14 @@ fn force_balancing() -> Result<(), String> {
   // echo data.formatInline
   assert_eq!(
     data.format_inline(),
-    String::from("(((0 1 2) (3 4 5) (6 7 8)) ((9 10 11) (12 13 14) (15 16 17)) (18 19 _))")
+    String::from("((((0 1 2) 3 (4 5 6)) 7 ((8 9 10) 11 (12 13 14))) 15 ((16 17 18) 19))")
   );
   if let Err(msg) = data.force_inplace_balancing() {
     println!("[warning] {}", msg)
   }
   assert_eq!(
     data.format_inline(),
-    "(((0 1 _) (2 3 4) (5 6 _)) ((7 8 _) (9 10 _) (11 12 _)) ((13 14 _) (15 16 17) (18 19 _)))"
+    "(((0 1) (2 3 4) (5 6)) ((7 8) (9 10) (11 12)) ((13 14) (15 16 17) (18 19)))"
   );
   // echo data.formatInline
 
