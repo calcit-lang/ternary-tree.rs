@@ -56,8 +56,8 @@ where
     match self {
       Empty => 0,
       Leaf { .. } => 0,
-      Branch2 { depth, .. } => depth.to_owned(),
-      Branch3 { depth, .. } => depth.to_owned(),
+      Branch2 { depth, .. } => *depth,
+      Branch3 { depth, .. } => *depth,
     }
   }
 
@@ -74,8 +74,8 @@ where
     match self {
       Empty => 0,
       Leaf { .. } => 1,
-      Branch2 { size, .. } => size.to_owned(),
-      Branch3 { size, .. } => size.to_owned(),
+      Branch2 { size, .. } => *size,
+      Branch3 { size, .. } => *size,
     }
   }
 
@@ -271,8 +271,16 @@ where
     //   return None;
     // }
     match self {
-      Empty => unreachable!("out of bound, trying to get from empty"),
-      Leaf(value) => Some(value),
+      Branch3 { left, middle, right, .. } => {
+        let base = left.len();
+        if idx < base {
+          left.ref_get(idx)
+        } else if idx < base + middle.len() {
+          middle.ref_get(idx - base)
+        } else {
+          right.ref_get(idx - left.len() - middle.len())
+        }
+      }
       Branch2 { left, middle, .. } => {
         if idx < left.len() {
           left.ref_get(idx)
@@ -280,15 +288,8 @@ where
           middle.ref_get(idx - left.len())
         }
       }
-      Branch3 { left, middle, right, .. } => {
-        if idx < left.len() {
-          left.ref_get(idx)
-        } else if idx < left.len() + middle.len() {
-          middle.ref_get(idx - left.len())
-        } else {
-          right.ref_get(idx - left.len() - middle.len())
-        }
-      }
+      Leaf(value) => Some(value),
+      Empty => unreachable!("out of bound, trying to get from empty"),
     }
   }
 
@@ -711,7 +712,7 @@ where
           Ok(Branch2 {
             size: *size + 1,
             depth: decide_parent_depth_2(&changed_branch, middle),
-            left: Arc::new(changed_branch.to_owned()),
+            left: Arc::new(changed_branch),
             middle: middle.to_owned(),
           })
         } else {
@@ -721,7 +722,7 @@ where
             size: *size + 1,
             depth: decide_parent_depth_2(left, &changed_branch.to_owned()),
             left: left.to_owned(),
-            middle: Arc::new(changed_branch.to_owned()),
+            middle: Arc::new(changed_branch),
           })
         }
       }
