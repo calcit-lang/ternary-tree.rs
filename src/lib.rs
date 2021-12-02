@@ -45,6 +45,12 @@ pub enum TernaryTreeList<T> {
   },
 }
 
+/// special mark for helping in simulating finger tree bahaviors to operate head tails
+pub enum FingerMark {
+  Main(u8),
+  Side(u8),
+}
+
 use TernaryTreeList::*;
 
 impl<'a, T> TernaryTreeList<T>
@@ -947,6 +953,94 @@ where
     }
     result
   }
+
+  pub fn push_right_iter(&self, item: Self, mark: FingerMark) -> Self {
+    match mark {
+      FingerMark::Main(n) => match self {
+        Empty => item,
+        Leaf(a) => Branch2 {
+          size: 1 + item.len(),
+          depth: item.get_depth(),
+          left: Arc::new(Leaf(a.to_owned())),
+          middle: Arc::new(item),
+        },
+        Branch2 { size, left, middle, .. } => {
+          if middle.len() >= triple_size(n) {
+            Branch3 {
+              size: size + item.len(),
+              depth: decide_parent_depth_3(left, middle, &item),
+              left: left.to_owned(),
+              middle: middle.to_owned(),
+              right: Arc::new(item),
+            }
+          } else {
+            let changed_branch = middle.push_right_iter(item.to_owned(), FingerMark::Side(n));
+            Branch2 {
+              size: size + item.len(),
+              depth: decide_parent_depth_3(left, &changed_branch, &item),
+              left: left.to_owned(),
+              middle: { Arc::new(changed_branch) },
+            }
+          }
+        }
+        Branch3 {
+          size, left, middle, right, ..
+        } => {
+          if right.len() >= triple_size(n) {
+            Branch3 {
+              size: size + item.len(),
+              depth: decide_parent_depth_3(left, middle, &item),
+              left: left.to_owned(),
+              middle: Arc::new(middle.push_right_iter((**right).to_owned(), FingerMark::Main(n + 1))),
+              right: Arc::new(item),
+            }
+          } else {
+            let changed_branch = middle.push_right_iter(item, FingerMark::Side(n));
+            Branch3 {
+              size: size + 1,
+              depth: decide_parent_depth_2(left, &changed_branch),
+              left: left.to_owned(),
+              middle: middle.to_owned(),
+              right: Arc::new(right.push_right_iter(changed_branch, FingerMark::Side(n))),
+            }
+          }
+        }
+      },
+      FingerMark::Side(n) => match self {
+        Empty => item,
+        Leaf(a) => Branch2 {
+          size: 1 + item.len(),
+          depth: item.get_depth() + 1,
+          left: Arc::new(Leaf(a.to_owned())),
+          middle: Arc::new(item),
+        },
+        Branch2 { size, left, middle, .. } => Branch3 {
+          size: size + item.len(),
+          depth: decide_parent_depth_3(left, middle, &item),
+          left: left.to_owned(),
+          middle: middle.to_owned(),
+          right: Arc::new(item),
+        },
+        Branch3 {
+          size, left, middle, right, ..
+        } => {
+          let changed_branch = right.push_right_iter(item.to_owned(), FingerMark::Side(n - 1));
+          Branch3 {
+            size: size + item.len(),
+            depth: decide_parent_depth_3(left, middle, &changed_branch),
+            left: left.to_owned(),
+            middle: middle.to_owned(),
+            right: Arc::new(changed_branch),
+          }
+        }
+      },
+    }
+  }
+
+  pub fn push_right(&self, item: T) -> Self {
+    self.push_right_iter(Leaf(Arc::new(item)), FingerMark::Main(2))
+  }
+
   pub fn concat(raw: &[TernaryTreeList<T>]) -> Self {
     let mut xs_groups: Vec<TernaryTreeList<T>> = Vec::with_capacity(raw.len());
     for x in raw {
@@ -1390,4 +1484,9 @@ where
       write_leaves(right, acc, counter);
     }
   }
+}
+
+fn triple_size(t: u8) -> usize {
+  let n: usize = 3;
+  n.pow(t as u32)
 }
