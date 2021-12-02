@@ -46,9 +46,10 @@ pub enum TernaryTreeList<T> {
 }
 
 /// special mark for helping in simulating finger tree bahaviors to operate head tails
+#[derive(Debug)]
 pub enum FingerMark {
-  Main(u8),
-  Side(u8),
+  Main(i8),
+  Side(i8),
 }
 
 use TernaryTreeList::*;
@@ -955,17 +956,18 @@ where
   }
 
   pub fn push_right_iter(&self, item: Self, mark: FingerMark) -> Self {
+    // println!("    iter: {} {:?}", self.format_inline(), mark);
     match mark {
       FingerMark::Main(n) => match self {
         Empty => item,
         Leaf(a) => Branch2 {
           size: 1 + item.len(),
-          depth: item.get_depth(),
+          depth: item.get_depth() + 1,
           left: Arc::new(Leaf(a.to_owned())),
           middle: Arc::new(item),
         },
         Branch2 { size, left, middle, .. } => {
-          if middle.len() >= triple_size(n) {
+          if middle.len() + item.len() > left.len() || middle.len() >= triple_size(n) {
             Branch3 {
               size: size + item.len(),
               depth: decide_parent_depth_3(left, middle, &item),
@@ -974,34 +976,35 @@ where
               right: Arc::new(item),
             }
           } else {
-            let changed_branch = middle.push_right_iter(item.to_owned(), FingerMark::Side(n));
+            let item_size = item.len();
+            let changed_branch = middle.push_right_iter(item, FingerMark::Side(n - 1));
+
             Branch2 {
-              size: size + item.len(),
-              depth: decide_parent_depth_3(left, &changed_branch, &item),
+              size: size + item_size,
+              depth: decide_parent_depth_2(left, &changed_branch),
               left: left.to_owned(),
-              middle: { Arc::new(changed_branch) },
+              middle: Arc::new(changed_branch),
             }
           }
         }
         Branch3 {
           size, left, middle, right, ..
         } => {
-          if right.len() >= triple_size(n) {
-            Branch3 {
+          if right.len() + item.len() > middle.len() || middle.len() >= triple_size(n) {
+            Branch2 {
               size: size + item.len(),
-              depth: decide_parent_depth_3(left, middle, &item),
-              left: left.to_owned(),
-              middle: Arc::new(middle.push_right_iter((**right).to_owned(), FingerMark::Main(n + 1))),
-              right: Arc::new(item),
+              depth: decide_parent_depth_2(self, &item),
+              left: Arc::new(self.to_owned()),
+              middle: Arc::new(item),
             }
           } else {
-            let changed_branch = middle.push_right_iter(item, FingerMark::Side(n));
+            let changed_branch = right.push_right_iter(item, FingerMark::Side(n - 1));
             Branch3 {
               size: size + 1,
-              depth: decide_parent_depth_2(left, &changed_branch),
+              depth: decide_parent_depth_3(left, middle, &changed_branch),
               left: left.to_owned(),
               middle: middle.to_owned(),
-              right: Arc::new(right.push_right_iter(changed_branch, FingerMark::Side(n))),
+              right: Arc::new(changed_branch),
             }
           }
         }
@@ -1014,23 +1017,44 @@ where
           left: Arc::new(Leaf(a.to_owned())),
           middle: Arc::new(item),
         },
-        Branch2 { size, left, middle, .. } => Branch3 {
-          size: size + item.len(),
-          depth: decide_parent_depth_3(left, middle, &item),
-          left: left.to_owned(),
-          middle: middle.to_owned(),
-          right: Arc::new(item),
-        },
+        Branch2 { size, left, middle, .. } => {
+          if middle.len() + item.len() > left.len() {
+            Branch3 {
+              size: size + item.len(),
+              depth: decide_parent_depth_3(left, middle, &item),
+              left: left.to_owned(),
+              middle: middle.to_owned(),
+              right: Arc::new(item),
+            }
+          } else {
+            let changed_branch = middle.push_right_iter(item.to_owned(), FingerMark::Side(n - 1));
+            Branch2 {
+              size: size + item.len(),
+              depth: decide_parent_depth_3(left, middle, &changed_branch),
+              left: left.to_owned(),
+              middle: Arc::new(changed_branch),
+            }
+          }
+        }
         Branch3 {
           size, left, middle, right, ..
         } => {
-          let changed_branch = right.push_right_iter(item.to_owned(), FingerMark::Side(n - 1));
-          Branch3 {
-            size: size + item.len(),
-            depth: decide_parent_depth_3(left, middle, &changed_branch),
-            left: left.to_owned(),
-            middle: middle.to_owned(),
-            right: Arc::new(changed_branch),
+          if right.len() + item.len() > middle.len() {
+            Branch2 {
+              size: size + item.len(),
+              depth: decide_parent_depth_2(self, &item),
+              left: Arc::new(self.to_owned()),
+              middle: Arc::new(item),
+            }
+          } else {
+            let changed_branch = right.push_right_iter(item.to_owned(), FingerMark::Side(n - 1));
+            Branch3 {
+              size: size + item.len(),
+              depth: decide_parent_depth_3(left, middle, &changed_branch),
+              left: left.to_owned(),
+              middle: middle.to_owned(),
+              right: Arc::new(changed_branch),
+            }
           }
         }
       },
@@ -1486,7 +1510,7 @@ where
   }
 }
 
-fn triple_size(t: u8) -> usize {
+fn triple_size(t: i8) -> usize {
   let n: usize = 3;
   n.pow(t as u32)
 }
