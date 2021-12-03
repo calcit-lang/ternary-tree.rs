@@ -955,7 +955,7 @@ where
     result
   }
 
-  pub fn push_right_iter(&self, item: Self, mark: FingerMark) -> Self {
+  fn push_right_iter(&self, item: Self, mark: FingerMark) -> Self {
     // println!("    iter: {} {:?}", self.format_inline(), mark);
     match mark {
       FingerMark::Main(n) => match self {
@@ -1062,7 +1062,119 @@ where
   }
 
   pub fn push_right(&self, item: T) -> Self {
+    // start with 2 so its left child branch has capability of only 3^1
     self.push_right_iter(Leaf(Arc::new(item)), FingerMark::Main(2))
+  }
+
+  pub fn drop_left(&self) -> Self {
+    match self {
+      Empty => unreachable!("cannot drop from empty"),
+      Leaf(_) => {
+        unreachable!("not expected empty node inside tree")
+      }
+      Branch2 { size, left, middle, .. } => {
+        if left.len() == 1 {
+          (**middle).to_owned()
+        } else {
+          let changed_branch = left.drop_left();
+          match changed_branch {
+            Empty => unreachable!("does not expect empty inside tree"),
+            Branch2 {
+              left: b_left,
+              middle: b_middle,
+              ..
+            } => Branch3 {
+              size: size - 1,
+              depth: decide_parent_depth_3(&b_left, &b_middle, middle),
+              left: b_left.to_owned(),
+              middle: b_middle.to_owned(),
+              right: middle.to_owned(),
+            },
+            Branch3 {
+              left: b_left,
+              middle: b_middle,
+              right: b_right,
+              ..
+            } => {
+              let internal_branch = Branch2 {
+                size: b_middle.len() + b_right.len(),
+                depth: decide_parent_depth_2(&b_middle, &b_right),
+                left: b_middle,
+                middle: b_right,
+              };
+              Branch3 {
+                size: size - 1,
+                depth: decide_parent_depth_3(&b_left, &internal_branch, middle),
+                left: b_left.to_owned(),
+                middle: Arc::new(internal_branch),
+                right: middle.to_owned(),
+              }
+            }
+            _ => Branch2 {
+              size: size - 1,
+              depth: decide_parent_depth_2(&changed_branch, middle),
+              left: Arc::new(changed_branch),
+              middle: middle.to_owned(),
+            },
+          }
+        }
+      }
+      Branch3 {
+        size, left, middle, right, ..
+      } => {
+        if left.len() == 1 {
+          match &**middle {
+            Empty => unreachable!("unexpected empty inside tree"),
+            Branch2 {
+              left: b_left,
+              middle: b_middle,
+              ..
+            } => Branch3 {
+              size: size - 1,
+              depth: decide_parent_depth_3(b_left, b_middle, right),
+              left: b_left.to_owned(),
+              middle: b_middle.to_owned(),
+              right: right.to_owned(),
+            },
+            Branch3 {
+              left: b_left,
+              middle: b_middle,
+              right: b_right,
+              ..
+            } => {
+              let internal_branch = Branch2 {
+                size: b_middle.len() + b_right.len(),
+                depth: decide_parent_depth_2(b_middle, b_right),
+                left: b_middle.to_owned(),
+                middle: b_right.to_owned(),
+              };
+              Branch3 {
+                size: size - 1,
+                depth: decide_parent_depth_3(b_left, &internal_branch, right),
+                left: b_left.to_owned(),
+                middle: Arc::new(internal_branch),
+                right: right.to_owned(),
+              }
+            }
+            _ => Branch2 {
+              size: size - 1,
+              depth: decide_parent_depth_2(middle, right),
+              left: middle.to_owned(),
+              middle: right.to_owned(),
+            },
+          }
+        } else {
+          let changed_branch = left.drop_left();
+          Branch3 {
+            size: size - 1,
+            depth: decide_parent_depth_3(&changed_branch, middle, right),
+            left: Arc::new(changed_branch),
+            middle: middle.to_owned(),
+            right: right.to_owned(),
+          }
+        }
+      }
+    }
   }
 
   pub fn concat(raw: &[TernaryTreeList<T>]) -> Self {

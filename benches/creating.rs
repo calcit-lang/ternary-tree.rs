@@ -13,6 +13,16 @@ fn criterion_benchmark(c: &mut Criterion) {
     })
   });
 
+  c.bench_function("push_right list", |b| {
+    b.iter(|| {
+      let mut data = TernaryTreeList::Empty;
+
+      for idx in 0..1000 {
+        data = data.push_right(idx)
+      }
+    })
+  });
+
   c.bench_function("inserting in middle", |b| {
     b.iter(|| {
       let mut data = TernaryTreeList::Empty;
