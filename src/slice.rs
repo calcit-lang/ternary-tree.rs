@@ -1,5 +1,6 @@
 use std::fmt::{Debug, Display};
 use std::hash::Hash;
+use std::sync::Arc;
 
 use crate::tree::*;
 use crate::TernaryTreeList;
@@ -16,7 +17,7 @@ where
     } else {
       let mut ys: Vec<TernaryTree<T>> = Vec::with_capacity(xs.len());
       for x in &xs {
-        ys.push(Leaf(x.to_owned()))
+        ys.push(Leaf(Arc::new(x.to_owned())))
       }
 
       TernaryTreeList::Tree(TernaryTree::rebuild_list(xs.len(), 0, &ys))
@@ -34,7 +35,7 @@ where
     } else {
       let mut ys: Vec<TernaryTree<T>> = Vec::with_capacity(xs.len());
       for x in xs {
-        ys.push(Leaf(x.to_owned()))
+        ys.push(Leaf(Arc::new(x.to_owned())))
       }
 
       TernaryTreeList::Tree(TernaryTree::rebuild_list(xs.len(), 0, &ys))
@@ -53,7 +54,7 @@ where
     } else {
       let mut ys: Vec<TernaryTree<T>> = Vec::with_capacity(xs.len());
       for x in xs {
-        ys.push(Leaf(x.to_owned()))
+        ys.push(Leaf(Arc::new(x.to_owned())))
       }
 
       TernaryTreeList::Tree(TernaryTree::rebuild_list(xs.len(), 0, &ys))
