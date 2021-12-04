@@ -27,6 +27,18 @@ fn init_list() -> Result<(), String> {
 }
 
 #[test]
+fn init_list_push_right() -> Result<(), String> {
+  let mut data: Vec<usize> = vec![];
+  let mut tree: TernaryTreeList<usize> = TernaryTreeList::Empty;
+  for idx in 1..200 {
+    data.push(idx);
+    tree = tree.push_right(idx);
+    assert_eq!(tree, TernaryTreeList::from(data.to_owned()))
+  }
+  Ok(())
+}
+
+#[test]
 fn list_operations() -> Result<(), String> {
   let origin11 = &[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11];
   let data11 = TernaryTreeList::from(origin11);
@@ -70,6 +82,24 @@ fn list_operations() -> Result<(), String> {
   assert_eq!(TernaryTreeList::from(&[1, 2, 3]).butlast()?.format_inline(), "(1 2)");
   assert_eq!(TernaryTreeList::from(&[1, 2, 3, 4]).butlast()?.format_inline(), "(1 (2 3))");
   assert_eq!(TernaryTreeList::from(&[1, 2, 3, 4, 5]).butlast()?.format_inline(), "((1 2) 3 4)");
+
+  Ok(())
+}
+
+#[test]
+fn drop_left_data() -> Result<(), String> {
+  let mut data: Vec<usize> = vec![];
+  for idx in 1..200 {
+    data.push(idx);
+  }
+  let mut tree: TernaryTreeList<usize> = TernaryTreeList::from(data.to_owned());
+
+  // do once less than the length
+  for _ in 1..data.len() {
+    tree = tree.drop_left();
+    data.remove(0);
+    assert_eq!(tree, TernaryTreeList::from(data.to_owned()));
+  }
 
   Ok(())
 }
