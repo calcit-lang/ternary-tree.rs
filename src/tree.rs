@@ -11,7 +11,6 @@ use crate::util::{divide_ternary_sizes, rough_int_pow};
 
 #[derive(Clone, Debug)]
 pub enum TernaryTree<T> {
-  Empty,
   Leaf(Arc<T>),
   Branch2 {
     size: usize,
@@ -44,7 +43,6 @@ where
   /// just get, will not compute recursively
   pub fn get_depth(&self) -> u16 {
     match self {
-      Empty => 0,
       Leaf { .. } => 0,
       Branch2 { depth, .. } => *depth,
       Branch3 { depth, .. } => *depth,
@@ -53,7 +51,6 @@ where
 
   pub fn is_empty(&self) -> bool {
     match self {
-      Empty => true,
       Leaf { .. } => false,
       Branch2 { size, .. } => *size == 0,
       Branch3 { size, .. } => *size == 0,
@@ -62,7 +59,6 @@ where
 
   pub fn len(&self) -> usize {
     match self {
-      Empty => 0,
       Leaf { .. } => 1,
       Branch2 { size, .. } => *size,
       Branch3 { size, .. } => *size,
@@ -72,7 +68,7 @@ where
   // make list again from existed
   pub fn rebuild_list(size: usize, offset: usize, xs: &[TernaryTree<T>]) -> Self {
     match size {
-      0 => Empty,
+      0 => unreachable!("Does not work for empty list"),
       1 => xs[offset].to_owned(),
       2 => {
         let left = &xs[offset];
@@ -116,7 +112,6 @@ where
   /// turn into a compare representation, with `_` for holes
   pub fn format_inline(&self) -> String {
     match self {
-      Empty => String::from("_"),
       Leaf(value) => value.to_string(),
       Branch2 { left, middle, .. } => {
         // TODO maybe need more informations here
@@ -139,7 +134,6 @@ where
 
   pub fn find_index(&self, f: Arc<dyn Fn(&T) -> bool>) -> Option<i64> {
     match self {
-      Empty => None,
       Leaf(value) => {
         if f(value) {
           Some(0)
@@ -180,7 +174,6 @@ where
 
   pub fn index_of(&self, item: &T) -> Option<usize> {
     match self {
-      Empty => None,
       Leaf(value) => {
         if item == &**value {
           Some(0)
@@ -279,7 +272,6 @@ where
         }
       }
       Leaf(value) => Some(value),
-      Empty => unreachable!("out of bound, trying to get from empty"),
     }
   }
 
@@ -287,12 +279,8 @@ where
   pub fn loop_get(&self, original_idx: usize) -> Option<T> {
     let mut tree_parent = self.to_owned();
     let mut idx = original_idx;
-    while tree_parent != Empty {
+    loop {
       match tree_parent {
-        Empty => {
-          println!("[warning] trying to get {} from empty", idx);
-          return None;
-        }
         Leaf(value) => {
           if idx == 0 {
             return Some((*value).to_owned());
@@ -342,8 +330,6 @@ where
         }
       }
     }
-
-    unreachable!("Failed to get ${idx}")
   }
 
   pub fn first(&self) -> Option<&T> {
@@ -367,7 +353,6 @@ where
     }
 
     match self {
-      Empty => return Err(format!("Cannot assoc into empty, {}", idx)),
       Leaf { .. } => {
         if idx == 0 {
           Ok(Leaf(Arc::new(item)))
@@ -453,11 +438,10 @@ where
       return Err(format!("Index too large {} for {}", idx, self.len()));
     } else if self.len() == 1 {
       // idx already == 0
-      return Ok(Empty);
+      return Err(String::from("Cannot remove from singleton list"));
     }
 
     match self {
-      Empty => unreachable!("dissoc out of bound"),
       Leaf { .. } => unreachable!("dissoc should be handled at branches"),
       Branch2 { left, middle, size, .. } => {
         if left.len() + middle.len() != *size {
@@ -577,17 +561,6 @@ where
 
   pub fn insert(&self, idx: usize, item: T, after: bool) -> Result<Self, String> {
     match self {
-      Empty => {
-        if idx == 0 {
-          Ok(Leaf(Arc::new(item)))
-        } else {
-          Err(format!(
-            "Empty node is not a correct position for inserting {} for {}",
-            idx,
-            self.len()
-          ))
-        }
-      }
       Leaf { .. } => {
         if after {
           Ok(Branch2 {
@@ -878,7 +851,6 @@ where
   // TODO, need better strategy for detecting
   pub fn maybe_reblance(&mut self) -> Result<(), String> {
     match self {
-      Empty => Ok(()),
       Leaf(..) => Ok(()),
       Branch2 { .. } => Ok(()),
       Branch3 { size, .. } => {
@@ -942,7 +914,6 @@ where
     // println!("    iter: {} {:?}", self.format_inline(), mark);
     match mark {
       FingerMark::Main(n) => match self {
-        Empty => item,
         Leaf(a) => Branch2 {
           size: 1 + item.len(),
           depth: item.get_depth() + 1,
@@ -993,7 +964,6 @@ where
         }
       },
       FingerMark::Side(n) => match self {
-        Empty => item,
         Leaf(a) => Branch2 {
           size: 1 + item.len(),
           depth: item.get_depth() + 1,
@@ -1051,7 +1021,6 @@ where
 
   pub fn drop_left(&self) -> Self {
     match self {
-      Empty => unreachable!("cannot drop from empty"),
       Leaf(_) => {
         unreachable!("not expected empty node inside tree")
       }
@@ -1061,7 +1030,6 @@ where
         } else {
           let changed_branch = left.drop_left();
           match changed_branch {
-            Empty => unreachable!("does not expect empty inside tree"),
             Branch2 {
               left: b_left,
               middle: b_middle,
@@ -1107,7 +1075,6 @@ where
       } => {
         if left.len() == 1 {
           match &**middle {
-            Empty => unreachable!("unexpected empty inside tree"),
             Branch2 {
               left: b_left,
               middle: b_middle,
@@ -1168,7 +1135,7 @@ where
       }
     }
     match xs_groups.len() {
-      0 => TernaryTree::Empty,
+      0 => unreachable!("does not work with empty list in ternary-tree"),
       1 => xs_groups[0].to_owned(),
       2 => {
         let left = xs_groups[0].to_owned();
@@ -1212,7 +1179,6 @@ where
       Ok(())
     } else {
       match self {
-        Empty => Ok(()),
         Leaf { .. } => Ok(()),
         Branch2 { left, middle, size, depth } => {
           if !self.is_empty() && *size == 0 {
@@ -1270,11 +1236,10 @@ where
       return Err(format!("Invalid slice range {}..{} for {}", start_idx, end_idx, self));
     }
     if start_idx == end_idx {
-      return Ok(Empty);
+      return Err(format!("Slice range empty {}..{} for {}", start_idx, end_idx, self));
     }
 
     match self {
-      Empty => return Err(format!("slicing {}..{} from empty", start_idx, end_idx)),
       Leaf { .. } => {
         if start_idx == 0 && end_idx == 1 {
           Ok(self.to_owned())
@@ -1360,11 +1325,10 @@ where
 
   pub fn reverse(&self) -> Self {
     if self.is_empty() {
-      return Empty;
+      unreachable!("don't call reverse on empty in ternary-tree");
     }
 
     match self {
-      Empty => Empty,
       Leaf { .. } => self.to_owned(),
       Branch2 { left, middle, size, depth } => Branch2 {
         size: *size,
@@ -1389,7 +1353,6 @@ where
   }
   pub fn map<V>(&self, f: Arc<dyn Fn(&T) -> V>) -> TernaryTree<V> {
     match self {
-      Empty => Empty,
       Leaf(value) => Leaf(Arc::new(f(value))),
       Branch2 { left, middle, size, depth } => Branch2 {
         size: *size,
@@ -1557,7 +1520,6 @@ where
   fn hash<H: Hasher>(&self, state: &mut H) {
     "ternary".hash(state);
     match self {
-      Empty => {}
       Leaf(value) => {
         "leaf".hash(state);
         value.hash(state);
@@ -1587,7 +1549,6 @@ where
   }
 
   match xs {
-    Empty => {}
     Leaf { .. } => {
       let idx = counter.take();
       acc.push(xs.to_owned());

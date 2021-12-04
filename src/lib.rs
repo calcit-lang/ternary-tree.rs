@@ -144,6 +144,8 @@ where
   pub fn rest(&self) -> Result<Self, String> {
     if self.is_empty() {
       Err(String::from("calling rest on empty"))
+    } else if self.len() == 1 {
+      Ok(TernaryTreeList::Empty)
     } else {
       self.dissoc(0)
     }
@@ -151,6 +153,8 @@ where
   pub fn butlast(&self) -> Result<Self, String> {
     if self.is_empty() {
       Err(String::from("calling butlast on empty"))
+    } else if self.len() == 1 {
+      Ok(TernaryTreeList::Empty)
     } else {
       self.dissoc(self.len() - 1)
     }
@@ -244,6 +248,9 @@ where
   }
   // excludes value at end_idx, kept aligned with JS & Clojure
   pub fn slice(&self, start_idx: usize, end_idx: usize) -> Result<Self, String> {
+    if start_idx == end_idx {
+      return Ok(TernaryTreeList::Empty);
+    }
     match self {
       Empty => Err(String::from("empty")),
       Tree(t) => Ok(TernaryTreeList::Tree(t.slice(start_idx, end_idx)?)),
