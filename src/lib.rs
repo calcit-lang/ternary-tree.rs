@@ -32,13 +32,13 @@ pub enum TernaryTreeList<T> {
   Leaf(Arc<T>),
   Branch2 {
     size: usize,
-    depth: u8,
+    depth: u16,
     left: Arc<TernaryTreeList<T>>,
     middle: Arc<TernaryTreeList<T>>,
   },
   Branch3 {
     size: usize,
-    depth: u8,
+    depth: u16,
     left: Arc<TernaryTreeList<T>>,
     middle: Arc<TernaryTreeList<T>>,
     right: Arc<TernaryTreeList<T>>,
@@ -59,7 +59,7 @@ where
   T: Clone + Display + Eq + PartialEq + Debug + Ord + PartialOrd + Hash,
 {
   /// just get, will not compute recursively
-  pub fn get_depth(&self) -> u8 {
+  pub fn get_depth(&self) -> u16 {
     match self {
       Empty => 0,
       Leaf { .. } => 0,
@@ -1450,7 +1450,7 @@ where
 fn decide_parent_depth_2<T: Clone + Display + Eq + PartialEq + Debug + Ord + PartialOrd + Hash>(
   x0: &TernaryTreeList<T>,
   x1: &TernaryTreeList<T>,
-) -> u8 {
+) -> u16 {
   cmp::max(x0.get_depth(), x1.get_depth()) + 1
 }
 
@@ -1459,7 +1459,8 @@ fn decide_parent_depth_3<T: Clone + Display + Eq + PartialEq + Debug + Ord + Par
   x0: &TernaryTreeList<T>,
   x1: &TernaryTreeList<T>,
   x2: &TernaryTreeList<T>,
-) -> u8 {
+) -> u16 {
+  // println!("{} {} {}", x0.get_depth(), x1.get_depth(), x2.get_depth());
   cmp::max(cmp::max(x0.get_depth(), x1.get_depth()), x2.get_depth()) + 1
 }
 

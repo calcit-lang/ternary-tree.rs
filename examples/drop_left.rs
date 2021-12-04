@@ -23,5 +23,18 @@ pub fn main() -> Result<(), String> {
     println!("{}", data4.format_inline());
   }
 
+  let mut data = TernaryTreeList::Empty;
+
+  for idx in 0..1000 {
+    data = data.push(idx)
+  }
+
+  let mut d = data.to_owned();
+
+  while d.len() > 1 {
+    d = d.drop_left();
+    println!("{}", d.format_inline());
+  }
+
   Ok(())
 }
