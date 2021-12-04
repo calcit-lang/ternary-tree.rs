@@ -13,24 +13,34 @@ fn criterion_benchmark(c: &mut Criterion) {
     })
   });
 
-  c.bench_function("inserting in middle", |b| {
+  c.bench_function("creating list disable balancing", |b| {
     b.iter(|| {
       let mut data = TernaryTreeList::Empty;
 
       for idx in 0..1000 {
-        let pos = idx / 2;
-        data = data.insert(pos, idx, false).unwrap()
+        data = data.append(idx, true)
       }
     })
   });
 
-  c.bench_function("inserting in middle without balancing", |b| {
+  c.bench_function("push_right list", |b| {
     b.iter(|| {
       let mut data = TernaryTreeList::Empty;
 
       for idx in 0..1000 {
+        data = data.push_right(idx)
+      }
+    })
+  });
+
+  c.bench_function("inserting in middle", |b| {
+    b.iter(|| {
+      let mut data = TernaryTreeList::Empty;
+
+      // TODO overflowed
+      for idx in 0..1000 {
         let pos = idx / 2;
-        data = data.insert(pos, idx, true).unwrap()
+        data = data.insert(pos, idx, false).unwrap()
       }
     })
   });
@@ -39,8 +49,7 @@ fn criterion_benchmark(c: &mut Criterion) {
     let mut data = TernaryTreeList::Empty;
 
     for idx in 0..1000 {
-      let pos = idx / 2;
-      data = data.insert(pos, idx, false).unwrap()
+      data = data.push(idx);
     }
 
     b.iter(move || {
@@ -52,12 +61,59 @@ fn criterion_benchmark(c: &mut Criterion) {
     })
   });
 
+  c.bench_function("rest from push_right", |b| {
+    let mut data = TernaryTreeList::Empty;
+
+    for idx in 0..1000 {
+      data = data.push_right(idx);
+    }
+
+    b.iter(move || {
+      let mut d = data.to_owned();
+
+      while !d.is_empty() {
+        d = d.slice(1, d.len()).unwrap()
+      }
+    })
+  });
+
+  c.bench_function("drop-left", |b| {
+    let mut data = TernaryTreeList::Empty;
+
+    for idx in 0..1000 {
+      data = data.push(idx);
+    }
+
+    b.iter(move || {
+      let mut d = data.to_owned();
+
+      while d.len() > 1 {
+        d = d.drop_left()
+      }
+    })
+  });
+
+  c.bench_function("drop-left from push_right", |b| {
+    let mut data = TernaryTreeList::Empty;
+
+    for idx in 0..1000 {
+      data = data.push_right(idx);
+    }
+
+    b.iter(move || {
+      let mut d = data.to_owned();
+
+      while d.len() > 1 {
+        d = d.drop_left()
+      }
+    })
+  });
+
   c.bench_function("slice", |b| {
     let mut data = TernaryTreeList::Empty;
 
     for idx in 0..1000 {
-      let pos = idx / 2;
-      data = data.insert(pos, idx, false).unwrap()
+      data = data.push(idx)
     }
 
     b.iter(move || {

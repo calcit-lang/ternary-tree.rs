@@ -5,7 +5,7 @@ use std::sync::Arc;
 fn init_list() -> Result<(), String> {
   assert_eq!(
     TernaryTreeList::from(&[1, 2, 3, 4]).to_string(),
-    String::from("TernaryTreeList[4, ...]")
+    String::from("TernaryTree[4, ...]")
   );
 
   let origin11 = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11];
@@ -23,6 +23,18 @@ fn init_list() -> Result<(), String> {
   let empty_xs: Vec<usize> = vec![];
   assert_eq!(TernaryTreeList::Empty, TernaryTreeList::from(empty_xs));
 
+  Ok(())
+}
+
+#[test]
+fn init_list_push_right() -> Result<(), String> {
+  let mut data: Vec<usize> = vec![];
+  let mut tree: TernaryTreeList<usize> = TernaryTreeList::Empty;
+  for idx in 1..200 {
+    data.push(idx);
+    tree = tree.push_right(idx);
+    assert_eq!(tree, TernaryTreeList::from(data.to_owned()))
+  }
   Ok(())
 }
 
@@ -70,6 +82,24 @@ fn list_operations() -> Result<(), String> {
   assert_eq!(TernaryTreeList::from(&[1, 2, 3]).butlast()?.format_inline(), "(1 2)");
   assert_eq!(TernaryTreeList::from(&[1, 2, 3, 4]).butlast()?.format_inline(), "(1 (2 3))");
   assert_eq!(TernaryTreeList::from(&[1, 2, 3, 4, 5]).butlast()?.format_inline(), "((1 2) 3 4)");
+
+  Ok(())
+}
+
+#[test]
+fn drop_left_data() -> Result<(), String> {
+  let mut data: Vec<usize> = vec![];
+  for idx in 0..200 {
+    data.push(idx);
+  }
+  let mut tree: TernaryTreeList<usize> = TernaryTreeList::from(data.to_owned());
+
+  // do once less than the length
+  for _ in 0..data.len() {
+    tree = tree.drop_left();
+    data.remove(0);
+    assert_eq!(tree, TernaryTreeList::from(data.to_owned()));
+  }
 
   Ok(())
 }
