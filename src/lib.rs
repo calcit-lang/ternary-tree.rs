@@ -164,7 +164,7 @@ where
     match self {
       Empty => {
         if idx == 0 {
-          Ok(TernaryTreeList::Tree(TernaryTree::Leaf(Arc::new(item))))
+          Ok(TernaryTreeList::Tree(TernaryTree::Leaf(item)))
         } else {
           Err(String::from("inserting into empty, but index is not 0"))
         }
@@ -199,7 +199,7 @@ where
   }
   pub fn prepend(&self, item: T, disable_balancing: bool) -> Self {
     match self {
-      Empty => TernaryTreeList::Tree(TernaryTree::Leaf(Arc::new(item))),
+      Empty => TernaryTreeList::Tree(TernaryTree::Leaf(item)),
       Tree(t) => TernaryTreeList::Tree(t.prepend(item, disable_balancing)),
     }
   }
@@ -208,13 +208,13 @@ where
   }
   pub fn append(&self, item: T, disable_balancing: bool) -> Self {
     match self {
-      Empty => TernaryTreeList::Tree(TernaryTree::Leaf(Arc::new(item))),
+      Empty => TernaryTreeList::Tree(TernaryTree::Leaf(item)),
       Tree(t) => TernaryTreeList::Tree(t.append(item, disable_balancing)),
     }
   }
   pub fn push_right(&self, item: T) -> Self {
     match self {
-      Empty => TernaryTreeList::Tree(TernaryTree::Leaf(Arc::new(item))),
+      Empty => TernaryTreeList::Tree(TernaryTree::Leaf(item)),
       Tree(t) => TernaryTreeList::Tree(t.push_right(item)),
     }
   }
@@ -222,7 +222,13 @@ where
   pub fn drop_left(&self) -> Self {
     match self {
       Empty => TernaryTreeList::Empty,
-      Tree(t) => TernaryTreeList::Tree(t.drop_left()),
+      Tree(t) => {
+        if t.len() == 1 {
+          TernaryTreeList::Empty
+        } else {
+          TernaryTreeList::Tree(t.drop_left())
+        }
+      }
     }
   }
 

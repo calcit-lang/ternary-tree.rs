@@ -89,13 +89,13 @@ fn list_operations() -> Result<(), String> {
 #[test]
 fn drop_left_data() -> Result<(), String> {
   let mut data: Vec<usize> = vec![];
-  for idx in 1..200 {
+  for idx in 0..200 {
     data.push(idx);
   }
   let mut tree: TernaryTreeList<usize> = TernaryTreeList::from(data.to_owned());
 
   // do once less than the length
-  for _ in 1..data.len() {
+  for _ in 0..data.len() {
     tree = tree.drop_left();
     data.remove(0);
     assert_eq!(tree, TernaryTreeList::from(data.to_owned()));

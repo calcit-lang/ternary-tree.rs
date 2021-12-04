@@ -11,7 +11,7 @@ use crate::util::{divide_ternary_sizes, rough_int_pow};
 
 #[derive(Clone, Debug)]
 pub enum TernaryTree<T> {
-  Leaf(Arc<T>),
+  Leaf(T),
   Branch2 {
     size: usize,
     depth: u16,
@@ -175,7 +175,7 @@ where
   pub fn index_of(&self, item: &T) -> Option<usize> {
     match self {
       Leaf(value) => {
-        if item == &**value {
+        if item == value {
           Some(0)
         } else {
           None
@@ -283,7 +283,7 @@ where
       match tree_parent {
         Leaf(value) => {
           if idx == 0 {
-            return Some((*value).to_owned());
+            return Some(value.to_owned());
           } else {
             println!("[warning] Cannot get from leaf with index {}", idx);
             return None;
@@ -355,7 +355,7 @@ where
     match self {
       Leaf { .. } => {
         if idx == 0 {
-          Ok(Leaf(Arc::new(item)))
+          Ok(Leaf(item))
         } else {
           Err(format!("Cannot assoc leaf into index {}", idx))
         }
@@ -567,13 +567,13 @@ where
             depth: 1,
             size: 2,
             left: Arc::new(self.to_owned()),
-            middle: Arc::new(Leaf(Arc::new(item))),
+            middle: Arc::new(Leaf(item)),
           })
         } else {
           Ok(Branch2 {
             depth: 1,
             size: 2,
-            left: Arc::new(Leaf(Arc::new(item))),
+            left: Arc::new(Leaf(item)),
             middle: Arc::new(self.to_owned()),
           })
         }
@@ -589,13 +589,13 @@ where
               size: 2,
               depth: 1,
               left: left.to_owned(),
-              middle: Arc::new(Leaf(Arc::new(item))),
+              middle: Arc::new(Leaf(item)),
             });
           } else {
             return Ok(Branch2 {
               size: 2,
               depth: 1,
-              left: Arc::new(Leaf(Arc::new(item))),
+              left: Arc::new(Leaf(item)),
               middle: left.to_owned(),
             });
           }
@@ -608,7 +608,7 @@ where
                 size: 3,
                 depth: 1,
                 left: left.to_owned(),
-                middle: Arc::new(Leaf(Arc::new(item))),
+                middle: Arc::new(Leaf(item)),
                 right: middle.to_owned(),
               });
             }
@@ -618,7 +618,7 @@ where
                 depth: 1,
                 left: left.to_owned(),
                 middle: middle.to_owned(),
-                right: Arc::new(Leaf(Arc::new(item))),
+                right: Arc::new(Leaf(item)),
               });
             } else {
               return Err(String::from("cannot insert after position 2 since only 2 elements here"));
@@ -627,7 +627,7 @@ where
             return Ok(Branch3 {
               size: 3,
               depth: 1,
-              left: Arc::new(Leaf(Arc::new(item))),
+              left: Arc::new(Leaf(item)),
               middle: left.to_owned(),
               right: middle.to_owned(),
             });
@@ -636,7 +636,7 @@ where
               size: 3,
               depth: 1,
               left: left.to_owned(),
-              middle: Arc::new(Leaf(Arc::new(item))),
+              middle: Arc::new(Leaf(item)),
               right: middle.to_owned(),
             });
           } else {
@@ -654,7 +654,7 @@ where
           return Ok(Branch3 {
             size: *size + 1,
             depth: *depth,
-            left: Arc::new(Leaf(Arc::new(item))),
+            left: Arc::new(Leaf(item)),
             middle: left.to_owned(),
             right: middle.to_owned(),
           });
@@ -666,7 +666,7 @@ where
             depth: *depth,
             left: left.to_owned(),
             middle: middle.to_owned(),
-            right: Arc::new(Leaf(Arc::new(item))),
+            right: Arc::new(Leaf(item)),
           });
         }
 
@@ -704,13 +704,13 @@ where
               size: 2,
               depth: 1,
               left: left.to_owned(),
-              middle: Arc::new(Leaf(Arc::new(item))),
+              middle: Arc::new(Leaf(item)),
             });
           } else {
             return Ok(Branch2 {
               size: 2,
               depth: 1,
-              left: Arc::new(Leaf(Arc::new(item))),
+              left: Arc::new(Leaf(item)),
               middle: left.to_owned(),
             });
           }
@@ -723,7 +723,7 @@ where
                 size: 3,
                 depth: 1,
                 left: left.to_owned(),
-                middle: Arc::new(Leaf(Arc::new(item))),
+                middle: Arc::new(Leaf(item)),
                 right: middle.to_owned(),
               });
             }
@@ -733,7 +733,7 @@ where
                 depth: 1,
                 left: left.to_owned(),
                 middle: middle.to_owned(),
-                right: Arc::new(Leaf(Arc::new(item))),
+                right: Arc::new(Leaf(item)),
               });
             } else {
               return Err(String::from("cannot insert after position 2 since only 2 elements here"));
@@ -742,7 +742,7 @@ where
             return Ok(Branch3 {
               size: 3,
               depth: 1,
-              left: Arc::new(Leaf(Arc::new(item))),
+              left: Arc::new(Leaf(item)),
               middle: left.to_owned(),
               right: middle.to_owned(),
             });
@@ -751,7 +751,7 @@ where
               size: 3,
               depth: 1,
               left: left.to_owned(),
-              middle: Arc::new(Leaf(Arc::new(item))),
+              middle: Arc::new(Leaf(item)),
               right: middle.to_owned(),
             });
           } else {
@@ -769,7 +769,7 @@ where
           return Ok(Branch2 {
             size: *size + 1,
             depth: depth + 1,
-            left: Arc::new(Leaf(Arc::new(item))),
+            left: Arc::new(Leaf(item)),
             middle: Arc::new(self.to_owned()),
           });
         }
@@ -779,7 +779,7 @@ where
             size: *size + 1,
             depth: depth + 1,
             left: Arc::new(self.to_owned()),
-            middle: Arc::new(Leaf(Arc::new(item))),
+            middle: Arc::new(Leaf(item)),
           });
         }
 
@@ -789,7 +789,7 @@ where
             depth: depth.to_owned(),
             left: left.to_owned(),
             middle: middle.to_owned(),
-            right: Arc::new(Leaf(Arc::new(item))),
+            right: Arc::new(Leaf(item)),
           });
         }
 
@@ -797,7 +797,7 @@ where
           return Ok(Branch3 {
             size: *size + 1,
             depth: depth.to_owned(),
-            left: Arc::new(Leaf(Arc::new(item))),
+            left: Arc::new(Leaf(item)),
             middle: left.to_owned(),
             right: middle.to_owned(),
           });
@@ -874,7 +874,7 @@ where
   }
   pub fn prepend(&self, item: T, disable_balancing: bool) -> Self {
     if self.is_empty() {
-      return Leaf(Arc::new(item));
+      return Leaf(item);
     }
 
     let mut result = match self.insert(0, item, false) {
@@ -895,7 +895,7 @@ where
   }
   pub fn append(&self, item: T, disable_balancing: bool) -> Self {
     if self.is_empty() {
-      return Leaf(Arc::new(item));
+      return Leaf(item);
     }
     let mut result = match self.insert(self.len() - 1, item, true) {
       Ok(v) => v,
@@ -1016,7 +1016,7 @@ where
 
   pub fn push_right(&self, item: T) -> Self {
     // start with 2 so its left child branch has capability of only 3^1
-    self.push_right_iter(Leaf(Arc::new(item)), FingerMark::Main(2))
+    self.push_right_iter(Leaf(item), FingerMark::Main(2))
   }
 
   pub fn drop_left(&self) -> Self {
@@ -1353,7 +1353,7 @@ where
   }
   pub fn map<V>(&self, f: Arc<dyn Fn(&T) -> V>) -> TernaryTree<V> {
     match self {
-      Leaf(value) => Leaf(Arc::new(f(value))),
+      Leaf(value) => Leaf(f(value)),
       Branch2 { left, middle, size, depth } => Branch2 {
         size: *size,
         depth: *depth,
