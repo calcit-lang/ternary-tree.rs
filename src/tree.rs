@@ -9,6 +9,7 @@ use std::sync::Arc;
 
 use crate::util::{divide_ternary_sizes, rough_int_pow};
 
+/// internal tree structure without empty nodes
 #[derive(Clone, Debug)]
 pub enum TernaryTree<T> {
   Leaf(Arc<T>),
@@ -55,20 +56,17 @@ where
     }
   }
 
-  pub fn is_empty(&self) -> bool {
-    match self {
-      Leaf { .. } => false,
-      Branch2 { size, .. } => *size == 0,
-      Branch3 { size, .. } => *size == 0,
-    }
-  }
-
   pub fn len(&self) -> usize {
     match self {
       Leaf { .. } => 1,
       Branch2 { size, .. } => *size,
       Branch3 { size, .. } => *size,
     }
+  }
+
+  /// never empty in this tree
+  pub fn is_empty(&self) -> bool {
+    false
   }
 
   /// make list again from existed
@@ -157,7 +155,7 @@ where
   }
 
   pub fn get(&self, idx: usize) -> Option<&T> {
-    if self.is_empty() || idx >= self.len() {
+    if idx >= self.len() {
       None
     } else {
       self.ref_get(idx)
@@ -234,14 +232,6 @@ where
 
   /// recursively check structure
   pub fn is_shape_same(&self, ys: &Self) -> bool {
-    if self.is_empty() {
-      return ys.is_empty();
-    }
-
-    if ys.is_empty() {
-      return false;
-    }
-
     if self.len() != ys.len() {
       return false;
     }
@@ -365,19 +355,11 @@ where
   }
 
   pub fn first(&self) -> Option<&T> {
-    if self.is_empty() {
-      None
-    } else {
-      self.ref_get(0)
-    }
+    self.ref_get(0)
   }
 
   pub fn last(&self) -> Option<&T> {
-    if self.is_empty() {
-      None
-    } else {
-      self.ref_get(self.len() - 1)
-    }
+    self.ref_get(self.len() - 1)
   }
   pub fn assoc(&self, idx: usize, item: T) -> Result<Self, String> {
     if idx > self.len() - 1 {
@@ -462,10 +444,6 @@ where
     }
   }
   pub fn dissoc(&self, idx: usize) -> Result<Self, String> {
-    if self.is_empty() {
-      return Err(String::from("Cannot remove from empty list"));
-    }
-
     if idx > self.len() - 1 {
       return Err(format!("Index too large {} for {}", idx, self.len()));
     } else if self.len() == 1 {
@@ -577,15 +555,15 @@ where
     }
   }
   pub fn rest(&self) -> Result<Self, String> {
-    if self.is_empty() {
-      Err(String::from("calling rest on empty"))
+    if self.len() == 1 {
+      Err(String::from("unexpected leaf for rest"))
     } else {
       self.dissoc(0)
     }
   }
   pub fn butlast(&self) -> Result<Self, String> {
-    if self.is_empty() {
-      Err(String::from("calling butlast on empty"))
+    if self.len() == 1 {
+      Err(String::from("unexpected leaf for butlast"))
     } else {
       self.dissoc(self.len() - 1)
     }
@@ -905,10 +883,6 @@ where
     self.prepend(item, false)
   }
   pub fn prepend(&self, item: T, disable_balancing: bool) -> Self {
-    if self.is_empty() {
-      return Leaf(Arc::new(item));
-    }
-
     let mut result = match self.insert(0, item, false) {
       Ok(v) => v,
       Err(e) => unreachable!(e),
@@ -926,9 +900,6 @@ where
     self.append(item, false)
   }
   pub fn append(&self, item: T, disable_balancing: bool) -> Self {
-    if self.is_empty() {
-      return Leaf(Arc::new(item));
-    }
     let mut result = match self.insert(self.len() - 1, item, true) {
       Ok(v) => v,
       Err(e) => unreachable!(e),
@@ -1162,9 +1133,7 @@ where
   pub fn concat(raw: &[TernaryTree<T>]) -> Self {
     let mut xs_groups: Vec<TernaryTree<T>> = Vec::with_capacity(raw.len());
     for x in raw {
-      if !x.is_empty() {
-        xs_groups.push(x.to_owned());
-      }
+      xs_groups.push(x.to_owned());
     }
     match xs_groups.len() {
       0 => unreachable!("does not work with empty list in ternary-tree"),
@@ -1194,9 +1163,7 @@ where
       _ => {
         let mut ys: Vec<TernaryTree<T>> = vec![];
         for x in xs_groups {
-          if !x.is_empty() {
-            ys.push(x.to_owned())
-          }
+          ys.push(x.to_owned())
         }
         let mut result = Self::rebuild_list(ys.len(), 0, &ys, FingerMark::default());
         if let Err(msg) = result.maybe_reblance() {
@@ -1207,54 +1174,42 @@ where
     }
   }
   pub fn check_structure(&self) -> Result<(), String> {
-    if self.is_empty() {
-      Ok(())
-    } else {
-      match self {
-        Leaf { .. } => Ok(()),
-        Branch2 { left, middle, size, depth } => {
-          if !self.is_empty() && *size == 0 {
-            return Err(String::from("branch but has size"));
-          }
-
-          if *size != left.len() + middle.len() {
-            return Err(format!("Bad size at branch {}", self.format_inline()));
-          }
-
-          if *depth != decide_parent_depth_2(left, middle) {
-            return Err(format!("Bad depth at branch {}", self.format_inline()));
-          }
-
-          left.check_structure()?;
-          middle.check_structure()?;
-
-          Ok(())
+    match self {
+      Leaf { .. } => Ok(()),
+      Branch2 { left, middle, size, depth } => {
+        if *size != left.len() + middle.len() {
+          return Err(format!("Bad size at branch {}", self.format_inline()));
         }
-        Branch3 {
-          left,
-          middle,
-          right,
-          size,
-          depth,
-        } => {
-          if !self.is_empty() && *size == 0 {
-            return Err(String::from("branch but has size"));
-          }
 
-          if *size != left.len() + middle.len() + right.len() {
-            return Err(format!("Bad size at branch {}", self.format_inline()));
-          }
-
-          if *depth != decide_parent_depth_3(left, middle, right) {
-            return Err(format!("Bad depth at branch {}", self.format_inline()));
-          }
-
-          left.check_structure()?;
-          middle.check_structure()?;
-          right.check_structure()?;
-
-          Ok(())
+        if *depth != decide_parent_depth_2(left, middle) {
+          return Err(format!("Bad depth at branch {}", self.format_inline()));
         }
+
+        left.check_structure()?;
+        middle.check_structure()?;
+
+        Ok(())
+      }
+      Branch3 {
+        left,
+        middle,
+        right,
+        size,
+        depth,
+      } => {
+        if *size != left.len() + middle.len() + right.len() {
+          return Err(format!("Bad size at branch {}", self.format_inline()));
+        }
+
+        if *depth != decide_parent_depth_3(left, middle, right) {
+          return Err(format!("Bad depth at branch {}", self.format_inline()));
+        }
+
+        left.check_structure()?;
+        middle.check_structure()?;
+        right.check_structure()?;
+
+        Ok(())
       }
     }
   }
@@ -1356,10 +1311,6 @@ where
   }
 
   pub fn reverse(&self) -> Self {
-    if self.is_empty() {
-      unreachable!("don't call reverse on empty in ternary-tree");
-    }
-
     match self {
       Leaf { .. } => self.to_owned(),
       Branch2 { left, middle, size, depth } => Branch2 {
@@ -1576,10 +1527,6 @@ fn write_leaves<T>(xs: &TernaryTree<T>, acc: &mut Vec<TernaryTree<T>>, counter: 
 where
   T: Clone + Display + Eq + PartialEq + Debug + Ord + PartialOrd + Hash,
 {
-  if xs.is_empty() {
-    return;
-  }
-
   match xs {
     Leaf { .. } => {
       let idx = counter.take();
