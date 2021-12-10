@@ -34,6 +34,12 @@ pub enum FingerMark {
   Side(i8),
 }
 
+impl Default for FingerMark {
+  fn default() -> Self {
+    FingerMark::Main(2)
+  }
+}
+
 use TernaryTree::*;
 
 impl<'a, T> TernaryTree<T>
@@ -68,7 +74,7 @@ where
   /// make list again from existed
   /// use a factor to control side branches to be shallow with smaller depth
   /// root node has a factor of 2
-  pub fn rebuild_list(size: usize, offset: usize, xs: &[TernaryTree<T>], factor: u8) -> Self {
+  pub fn rebuild_list(size: usize, offset: usize, xs: &[TernaryTree<T>], mark: FingerMark) -> Self {
     match size {
       0 => unreachable!("Does not work for empty list"),
       1 => xs[offset].to_owned(),
@@ -95,11 +101,35 @@ where
         }
       }
       _ => {
-        let divided = divide_ternary_sizes(size);
+        let (left, middle, right) = match mark {
+          FingerMark::Main(factor) => {
+            let side_capacity = rough_int_pow(3, factor as u16 - 1);
+            if side_capacity * 2 < size {
+              let divided = (side_capacity, size - side_capacity - side_capacity, side_capacity);
 
-        let left = Self::rebuild_list(divided.0, offset, xs, factor - 1);
-        let middle = Self::rebuild_list(divided.1, offset + divided.0, xs, factor + 1);
-        let right = Self::rebuild_list(divided.2, offset + divided.0 + divided.1, xs, factor - 1);
+              let left = Self::rebuild_list(divided.0, offset, xs, FingerMark::Side(factor - 1));
+              let middle = Self::rebuild_list(divided.1, offset + divided.0, xs, FingerMark::Main(factor + 1));
+              let right = Self::rebuild_list(divided.2, offset + divided.0 + divided.1, xs, FingerMark::Side(factor - 1));
+              (left, middle, right)
+            } else {
+              let divided = divide_ternary_sizes(size);
+
+              let left = Self::rebuild_list(divided.0, offset, xs, FingerMark::Side(factor - 1));
+              let middle = Self::rebuild_list(divided.1, offset + divided.0, xs, FingerMark::Side(factor - 1));
+              let right = Self::rebuild_list(divided.2, offset + divided.0 + divided.1, xs, FingerMark::Side(factor - 1));
+              (left, middle, right)
+            }
+          }
+          FingerMark::Side(factor) => {
+            let divided = divide_ternary_sizes(size);
+
+            let left = Self::rebuild_list(divided.0, offset, xs, FingerMark::Side(factor - 1));
+            let middle = Self::rebuild_list(divided.1, offset + divided.0, xs, FingerMark::Side(factor - 1));
+            let right = Self::rebuild_list(divided.2, offset + divided.0 + divided.1, xs, FingerMark::Side(factor - 1));
+            (left, middle, right)
+          }
+        };
+
         Branch3 {
           size: left.len() + middle.len() + right.len(),
           depth: decide_parent_depth_3(&left, &middle, &right),
@@ -847,7 +877,7 @@ where
   // this function mutates original tree to make it more balanced
   pub fn force_inplace_balancing(&mut self) -> Result<(), String> {
     let ys = self.to_leaves();
-    *self = Self::rebuild_list(ys.len(), 0, &ys, 2);
+    *self = Self::rebuild_list(ys.len(), 0, &ys, FingerMark::default());
     Ok(())
   }
   // TODO, need better strategy for detecting
@@ -1018,7 +1048,7 @@ where
 
   pub fn push_right(&self, item: T) -> Self {
     // start with 2 so its left child branch has capability of only 3^1
-    self.push_right_iter(Leaf(Arc::new(item)), FingerMark::Main(2))
+    self.push_right_iter(Leaf(Arc::new(item)), FingerMark::default())
   }
 
   pub fn drop_left(&self) -> Self {
@@ -1168,7 +1198,7 @@ where
             ys.push(x.to_owned())
           }
         }
-        let mut result = Self::rebuild_list(ys.len(), 0, &ys, 2);
+        let mut result = Self::rebuild_list(ys.len(), 0, &ys, FingerMark::default());
         if let Err(msg) = result.maybe_reblance() {
           println!("[warning] {}", msg)
         }
