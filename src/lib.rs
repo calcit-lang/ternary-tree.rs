@@ -116,18 +116,16 @@ where
   }
 
   pub fn first(&self) -> Option<&T> {
-    if self.is_empty() {
-      None
-    } else {
-      self.ref_get(0)
+    match self {
+      Empty => None,
+      Tree(t) => t.first(),
     }
   }
 
   pub fn last(&self) -> Option<&T> {
-    if self.is_empty() {
-      None
-    } else {
-      self.ref_get(self.len() - 1)
+    match self {
+      Empty => None,
+      Tree(t) => t.last(),
     }
   }
   pub fn assoc(&self, idx: usize, item: T) -> Result<Self, String> {

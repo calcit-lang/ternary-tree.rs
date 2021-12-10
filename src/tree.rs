@@ -355,11 +355,19 @@ where
   }
 
   pub fn first(&self) -> Option<&T> {
-    self.ref_get(0)
+    match self {
+      Leaf(value) => Some(value),
+      Branch2 { left, .. } => left.first(),
+      Branch3 { left, .. } => left.first(),
+    }
   }
 
   pub fn last(&self) -> Option<&T> {
-    self.ref_get(self.len() - 1)
+    match self {
+      Leaf(value) => Some(value),
+      Branch2 { middle, .. } => middle.last(),
+      Branch3 { right, .. } => right.last(),
+    }
   }
   pub fn assoc(&self, idx: usize, item: T) -> Result<Self, String> {
     if idx > self.len() - 1 {
