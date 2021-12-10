@@ -65,8 +65,10 @@ where
     }
   }
 
-  // make list again from existed
-  pub fn rebuild_list(size: usize, offset: usize, xs: &[TernaryTree<T>]) -> Self {
+  /// make list again from existed
+  /// use a factor to control side branches to be shallow with smaller depth
+  /// root node has a factor of 2
+  pub fn rebuild_list(size: usize, offset: usize, xs: &[TernaryTree<T>], factor: u8) -> Self {
     match size {
       0 => unreachable!("Does not work for empty list"),
       1 => xs[offset].to_owned(),
@@ -95,9 +97,9 @@ where
       _ => {
         let divided = divide_ternary_sizes(size);
 
-        let left = Self::rebuild_list(divided.0, offset, xs);
-        let middle = Self::rebuild_list(divided.1, offset + divided.0, xs);
-        let right = Self::rebuild_list(divided.2, offset + divided.0 + divided.1, xs);
+        let left = Self::rebuild_list(divided.0, offset, xs, factor - 1);
+        let middle = Self::rebuild_list(divided.1, offset + divided.0, xs, factor + 1);
+        let right = Self::rebuild_list(divided.2, offset + divided.0 + divided.1, xs, factor - 1);
         Branch3 {
           size: left.len() + middle.len() + right.len(),
           depth: decide_parent_depth_3(&left, &middle, &right),
@@ -845,7 +847,7 @@ where
   // this function mutates original tree to make it more balanced
   pub fn force_inplace_balancing(&mut self) -> Result<(), String> {
     let ys = self.to_leaves();
-    *self = Self::rebuild_list(ys.len(), 0, &ys);
+    *self = Self::rebuild_list(ys.len(), 0, &ys, 2);
     Ok(())
   }
   // TODO, need better strategy for detecting
@@ -1166,7 +1168,7 @@ where
             ys.push(x.to_owned())
           }
         }
-        let mut result = Self::rebuild_list(ys.len(), 0, &ys);
+        let mut result = Self::rebuild_list(ys.len(), 0, &ys, 2);
         if let Err(msg) = result.maybe_reblance() {
           println!("[warning] {}", msg)
         }

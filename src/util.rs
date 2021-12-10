@@ -27,9 +27,5 @@ pub fn rough_int_pow(x: usize, times: u16) -> usize {
     return x;
   }
 
-  let mut result = 1;
-  for _ in 0..times {
-    result *= x;
-  }
-  result
+  x.pow(times as u32)
 }

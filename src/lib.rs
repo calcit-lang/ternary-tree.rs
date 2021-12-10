@@ -12,7 +12,6 @@
 //! (((0 1 _) (2 3 4) (5 6 _)) ((7 8 _) (9 10 _) (11 12 _)) ((13 14 _) (15 16 17) (18 19 _)))
 //! ```
 
-mod slice;
 mod tree;
 mod util;
 
@@ -24,6 +23,8 @@ use std::ops::Index;
 use std::sync::Arc;
 
 pub use tree::TernaryTree;
+
+use crate::tree::TernaryTree::*;
 
 #[derive(Clone, Debug)]
 pub enum TernaryTreeList<T> {
@@ -400,6 +401,61 @@ where
     match self {
       Empty => {}
       Tree(t) => t.hash(state),
+    }
+  }
+}
+
+impl<T> From<Vec<T>> for TernaryTreeList<T>
+where
+  T: Clone + Display + Eq + PartialEq + Debug + Ord + PartialOrd + Hash,
+{
+  fn from(xs: Vec<T>) -> Self {
+    if xs.is_empty() {
+      TernaryTreeList::Empty
+    } else {
+      let mut ys: Vec<TernaryTree<T>> = Vec::with_capacity(xs.len());
+      for x in &xs {
+        ys.push(Leaf(Arc::new(x.to_owned())))
+      }
+
+      TernaryTreeList::Tree(TernaryTree::rebuild_list(xs.len(), 0, &ys, 2))
+    }
+  }
+}
+
+impl<T> From<&Vec<T>> for TernaryTreeList<T>
+where
+  T: Clone + Display + Eq + PartialEq + Debug + Ord + PartialOrd + Hash,
+{
+  fn from(xs: &Vec<T>) -> Self {
+    if xs.is_empty() {
+      TernaryTreeList::Empty
+    } else {
+      let mut ys: Vec<TernaryTree<T>> = Vec::with_capacity(xs.len());
+      for x in xs {
+        ys.push(Leaf(Arc::new(x.to_owned())))
+      }
+
+      TernaryTreeList::Tree(TernaryTree::rebuild_list(xs.len(), 0, &ys, 2))
+    }
+  }
+}
+
+// https://blog.rust-lang.org/2021/02/26/const-generics-mvp-beta.html
+impl<T, const N: usize> From<&[T; N]> for TernaryTreeList<T>
+where
+  T: Clone + Display + Eq + PartialEq + Debug + Ord + PartialOrd + Hash,
+{
+  fn from(xs: &[T; N]) -> Self {
+    if xs.is_empty() {
+      TernaryTreeList::Empty
+    } else {
+      let mut ys: Vec<TernaryTree<T>> = Vec::with_capacity(xs.len());
+      for x in xs {
+        ys.push(Leaf(Arc::new(x.to_owned())))
+      }
+
+      TernaryTreeList::Tree(TernaryTree::rebuild_list(xs.len(), 0, &ys, 2))
     }
   }
 }
