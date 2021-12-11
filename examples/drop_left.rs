@@ -1,3 +1,4 @@
+extern crate im_ternary_tree;
 use im_ternary_tree::TernaryTreeList;
 
 pub fn main() -> Result<(), String> {

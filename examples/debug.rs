@@ -1,3 +1,5 @@
+extern crate im_ternary_tree;
+
 use im_ternary_tree::TernaryTreeList;
 
 pub fn main() -> Result<(), String> {
@@ -38,11 +40,18 @@ pub fn main() -> Result<(), String> {
   //   }
   // }
 
-  for _ in 0..10 {
-    let mut data: TernaryTreeList<usize> = TernaryTreeList::Empty;
-    for idx in 0..10000 {
-      data = data.push(idx);
-    }
+  // for _ in 0..10 {
+  //   let mut data: TernaryTreeList<usize> = TernaryTreeList::Empty;
+  //   for idx in 0..10000 {
+  //     data = data.push(idx);
+  //   }
+  // }
+
+  let mut data: Vec<usize> = vec![];
+  for idx in 0..110 {
+    data.push(idx);
+    let tree = TernaryTreeList::from(&data);
+    println!("{}", tree.format_inline());
   }
 
   Ok(())

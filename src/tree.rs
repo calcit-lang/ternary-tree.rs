@@ -9,6 +9,7 @@ use std::sync::Arc;
 
 use crate::util::{divide_ternary_sizes, rough_int_pow};
 
+/// internal tree structure without empty nodes
 #[derive(Clone, Debug)]
 pub enum TernaryTree<T> {
   Leaf(Arc<T>),
@@ -27,13 +28,6 @@ pub enum TernaryTree<T> {
   },
 }
 
-/// special mark for helping in simulating finger tree bahaviors to operate head tails
-#[derive(Debug)]
-pub enum FingerMark {
-  Main(i8),
-  Side(i8),
-}
-
 use TernaryTree::*;
 
 impl<'a, T> TernaryTree<T>
@@ -49,14 +43,6 @@ where
     }
   }
 
-  pub fn is_empty(&self) -> bool {
-    match self {
-      Leaf { .. } => false,
-      Branch2 { size, .. } => *size == 0,
-      Branch3 { size, .. } => *size == 0,
-    }
-  }
-
   pub fn len(&self) -> usize {
     match self {
       Leaf { .. } => 1,
@@ -65,8 +51,45 @@ where
     }
   }
 
-  // make list again from existed
-  pub fn rebuild_list(size: usize, offset: usize, xs: &[TernaryTree<T>]) -> Self {
+  /// never empty in this tree
+  pub fn is_empty(&self) -> bool {
+    false
+  }
+
+  /// make list again from existed
+  /// use a factor to control side branches to be shallow with smaller depth
+  /// root node has a factor of 2
+  pub fn rebuild_list(size: usize, offset: usize, xs: &[TernaryTree<T>], factor: u8) -> Self {
+    match size {
+      0 => unreachable!("Does not work for empty list"),
+      1 => xs[offset].to_owned(),
+      2 => Self::rebuild_list_side(size, offset, xs),
+      3 => Self::rebuild_list_side(size, offset, xs),
+      _ => {
+        let side_capacity = triple_size(factor - 1);
+        if side_capacity * 2 < size {
+          let divided = (side_capacity, size - side_capacity - side_capacity, side_capacity);
+
+          let left = Self::rebuild_list_side(divided.0, offset, xs);
+          let middle = Self::rebuild_list(divided.1, offset + divided.0, xs, factor + 1);
+          let right = Self::rebuild_list_side(divided.2, offset + divided.0 + divided.1, xs);
+
+          Branch3 {
+            size,
+            depth: decide_parent_depth_3(&left, &middle, &right),
+            left: Arc::new(left),
+            middle: Arc::new(middle),
+            right: Arc::new(right),
+          }
+        } else {
+          Self::rebuild_list_side(size, offset, xs)
+        }
+      }
+    }
+  }
+
+  // sides have different algorithm
+  pub fn rebuild_list_side(size: usize, offset: usize, xs: &[TernaryTree<T>]) -> Self {
     match size {
       0 => unreachable!("Does not work for empty list"),
       1 => xs[offset].to_owned(),
@@ -85,7 +108,7 @@ where
         let middle = &xs[offset + 1];
         let right = &xs[offset + 2];
         Branch3 {
-          size: left.len() + middle.len() + right.len(),
+          size: 3,
           left: Arc::new(left.to_owned()),
           middle: Arc::new(middle.to_owned()),
           right: Arc::new(right.to_owned()),
@@ -95,9 +118,10 @@ where
       _ => {
         let divided = divide_ternary_sizes(size);
 
-        let left = Self::rebuild_list(divided.0, offset, xs);
-        let middle = Self::rebuild_list(divided.1, offset + divided.0, xs);
-        let right = Self::rebuild_list(divided.2, offset + divided.0 + divided.1, xs);
+        let left = Self::rebuild_list_side(divided.0, offset, xs);
+        let middle = Self::rebuild_list_side(divided.1, offset + divided.0, xs);
+        let right = Self::rebuild_list_side(divided.2, offset + divided.0 + divided.1, xs);
+
         Branch3 {
           size: left.len() + middle.len() + right.len(),
           depth: decide_parent_depth_3(&left, &middle, &right),
@@ -125,7 +149,7 @@ where
   }
 
   pub fn get(&self, idx: usize) -> Option<&T> {
-    if self.is_empty() || idx >= self.len() {
+    if idx >= self.len() {
       None
     } else {
       self.ref_get(idx)
@@ -202,14 +226,6 @@ where
 
   /// recursively check structure
   pub fn is_shape_same(&self, ys: &Self) -> bool {
-    if self.is_empty() {
-      return ys.is_empty();
-    }
-
-    if ys.is_empty() {
-      return false;
-    }
-
     if self.len() != ys.len() {
       return false;
     }
@@ -333,18 +349,18 @@ where
   }
 
   pub fn first(&self) -> Option<&T> {
-    if self.is_empty() {
-      None
-    } else {
-      self.ref_get(0)
+    match self {
+      Leaf(value) => Some(value),
+      Branch2 { left, .. } => left.first(),
+      Branch3 { left, .. } => left.first(),
     }
   }
 
   pub fn last(&self) -> Option<&T> {
-    if self.is_empty() {
-      None
-    } else {
-      self.ref_get(self.len() - 1)
+    match self {
+      Leaf(value) => Some(value),
+      Branch2 { middle, .. } => middle.last(),
+      Branch3 { right, .. } => right.last(),
     }
   }
   pub fn assoc(&self, idx: usize, item: T) -> Result<Self, String> {
@@ -430,10 +446,6 @@ where
     }
   }
   pub fn dissoc(&self, idx: usize) -> Result<Self, String> {
-    if self.is_empty() {
-      return Err(String::from("Cannot remove from empty list"));
-    }
-
     if idx > self.len() - 1 {
       return Err(format!("Index too large {} for {}", idx, self.len()));
     } else if self.len() == 1 {
@@ -545,15 +557,15 @@ where
     }
   }
   pub fn rest(&self) -> Result<Self, String> {
-    if self.is_empty() {
-      Err(String::from("calling rest on empty"))
+    if self.len() == 1 {
+      Err(String::from("unexpected leaf for rest"))
     } else {
       self.dissoc(0)
     }
   }
   pub fn butlast(&self) -> Result<Self, String> {
-    if self.is_empty() {
-      Err(String::from("calling butlast on empty"))
+    if self.len() == 1 {
+      Err(String::from("unexpected leaf for butlast"))
     } else {
       self.dissoc(self.len() - 1)
     }
@@ -845,7 +857,7 @@ where
   // this function mutates original tree to make it more balanced
   pub fn force_inplace_balancing(&mut self) -> Result<(), String> {
     let ys = self.to_leaves();
-    *self = Self::rebuild_list(ys.len(), 0, &ys);
+    *self = Self::rebuild_list(ys.len(), 0, &ys, 2);
     Ok(())
   }
   // TODO, need better strategy for detecting
@@ -873,10 +885,6 @@ where
     self.prepend(item, false)
   }
   pub fn prepend(&self, item: T, disable_balancing: bool) -> Self {
-    if self.is_empty() {
-      return Leaf(Arc::new(item));
-    }
-
     let mut result = match self.insert(0, item, false) {
       Ok(v) => v,
       Err(e) => unreachable!(e),
@@ -894,9 +902,6 @@ where
     self.append(item, false)
   }
   pub fn append(&self, item: T, disable_balancing: bool) -> Self {
-    if self.is_empty() {
-      return Leaf(Arc::new(item));
-    }
     let mut result = match self.insert(self.len() - 1, item, true) {
       Ok(v) => v,
       Err(e) => unreachable!(e),
@@ -910,18 +915,17 @@ where
     result
   }
 
-  fn push_right_iter(&self, item: Self, mark: FingerMark) -> Self {
-    // println!("    iter: {} {:?}", self.format_inline(), mark);
-    match mark {
-      FingerMark::Main(n) => match self {
-        Leaf(a) => Branch2 {
-          size: 1 + item.len(),
-          depth: item.get_depth() + 1,
-          left: Arc::new(Leaf(a.to_owned())),
-          middle: Arc::new(item),
-        },
+  // for main branches detect keep a finger-tree like shallow-deep-shallow shape
+  fn push_right_main(&self, item: Self, n: u8) -> Self {
+    // println!("  iter: {} {:?}", self.format_inline(), mark);
+
+    if self.len() + item.len() <= triple_size(n) {
+      self.push_right_side(item)
+    } else {
+      match self {
+        Leaf(_) => self.push_right_side(item),
         Branch2 { size, left, middle, .. } => {
-          if middle.len() + item.len() > left.len() || middle.len() >= triple_size(n) {
+          if middle.len() + item.len() > triple_size(n) {
             Branch3 {
               size: size + item.len(),
               depth: decide_parent_depth_3(left, middle, &item),
@@ -930,8 +934,10 @@ where
               right: Arc::new(item),
             }
           } else {
+            // pile items in the compact way like in sides
+            // println!("    try n: {}", n);
             let item_size = item.len();
-            let changed_branch = middle.push_right_iter(item, FingerMark::Side(n - 1));
+            let changed_branch = middle.push_right_side(item);
 
             Branch2 {
               size: size + item_size,
@@ -944,65 +950,21 @@ where
         Branch3 {
           size, left, middle, right, ..
         } => {
-          if right.len() + item.len() > middle.len() || middle.len() >= triple_size(n) {
-            Branch2 {
-              size: size + item.len(),
-              depth: decide_parent_depth_2(self, &item),
-              left: Arc::new(self.to_owned()),
-              middle: Arc::new(item),
-            }
-          } else {
-            let changed_branch = right.push_right_iter(item, FingerMark::Side(n - 1));
+          // println!("    b3 n: {}", n);
+          if right.len() + item.len() > triple_size(n - 1) {
+            let changed_branch = middle.push_right_main((**right).to_owned(), n + 1);
             Branch3 {
-              size: size + 1,
-              depth: decide_parent_depth_3(left, middle, &changed_branch),
+              size: left.len() + changed_branch.len() + item.len(),
+              depth: decide_parent_depth_3(left, &changed_branch, &item),
               left: left.to_owned(),
-              middle: middle.to_owned(),
-              right: Arc::new(changed_branch),
-            }
-          }
-        }
-      },
-      FingerMark::Side(n) => match self {
-        Leaf(a) => Branch2 {
-          size: 1 + item.len(),
-          depth: item.get_depth() + 1,
-          left: Arc::new(Leaf(a.to_owned())),
-          middle: Arc::new(item),
-        },
-        Branch2 { size, left, middle, .. } => {
-          if middle.len() + item.len() > left.len() {
-            Branch3 {
-              size: size + item.len(),
-              depth: decide_parent_depth_3(left, middle, &item),
-              left: left.to_owned(),
-              middle: middle.to_owned(),
+              middle: Arc::new(changed_branch),
               right: Arc::new(item),
             }
           } else {
-            let changed_branch = middle.push_right_iter(item.to_owned(), FingerMark::Side(n - 1));
-            Branch2 {
-              size: size + item.len(),
-              depth: decide_parent_depth_3(left, middle, &changed_branch),
-              left: left.to_owned(),
-              middle: Arc::new(changed_branch),
-            }
-          }
-        }
-        Branch3 {
-          size, left, middle, right, ..
-        } => {
-          if right.len() + item.len() > middle.len() {
-            Branch2 {
-              size: size + item.len(),
-              depth: decide_parent_depth_2(self, &item),
-              left: Arc::new(self.to_owned()),
-              middle: Arc::new(item),
-            }
-          } else {
-            let changed_branch = right.push_right_iter(item.to_owned(), FingerMark::Side(n - 1));
+            let item_size = item.len();
+            let changed_branch = right.push_right_side(item);
             Branch3 {
-              size: size + item.len(),
+              size: size + item_size,
               depth: decide_parent_depth_3(left, middle, &changed_branch),
               left: left.to_owned(),
               middle: middle.to_owned(),
@@ -1010,13 +972,66 @@ where
             }
           }
         }
+      }
+    }
+  }
+
+  // just pile items in the compact way
+  fn push_right_side(&self, item: Self) -> Self {
+    // println!("  iter: {} {:?}", self.format_inline(), mark);
+    match self {
+      Leaf(a) => Branch2 {
+        size: 1 + item.len(),
+        depth: item.get_depth() + 1,
+        left: Arc::new(Leaf(a.to_owned())),
+        middle: Arc::new(item),
       },
+      Branch2 { size, left, middle, .. } => {
+        if middle.len() + item.len() > left.len() {
+          Branch3 {
+            size: size + item.len(),
+            depth: decide_parent_depth_3(left, middle, &item),
+            left: left.to_owned(),
+            middle: middle.to_owned(),
+            right: Arc::new(item),
+          }
+        } else {
+          let changed_branch = middle.push_right_side(item.to_owned());
+          Branch2 {
+            size: size + item.len(),
+            depth: decide_parent_depth_3(left, middle, &changed_branch),
+            left: left.to_owned(),
+            middle: Arc::new(changed_branch),
+          }
+        }
+      }
+      Branch3 {
+        size, left, middle, right, ..
+      } => {
+        if right.len() + item.len() > middle.len() {
+          Branch2 {
+            size: size + item.len(),
+            depth: decide_parent_depth_2(self, &item),
+            left: Arc::new(self.to_owned()),
+            middle: Arc::new(item),
+          }
+        } else {
+          let changed_branch = right.push_right_side(item.to_owned());
+          Branch3 {
+            size: size + item.len(),
+            depth: decide_parent_depth_3(left, middle, &changed_branch),
+            left: left.to_owned(),
+            middle: middle.to_owned(),
+            right: Arc::new(changed_branch),
+          }
+        }
+      }
     }
   }
 
   pub fn push_right(&self, item: T) -> Self {
     // start with 2 so its left child branch has capability of only 3^1
-    self.push_right_iter(Leaf(Arc::new(item)), FingerMark::Main(2))
+    self.push_right_main(Leaf(Arc::new(item)), 2)
   }
 
   pub fn drop_left(&self) -> Self {
@@ -1130,9 +1145,7 @@ where
   pub fn concat(raw: &[TernaryTree<T>]) -> Self {
     let mut xs_groups: Vec<TernaryTree<T>> = Vec::with_capacity(raw.len());
     for x in raw {
-      if !x.is_empty() {
-        xs_groups.push(x.to_owned());
-      }
+      xs_groups.push(x.to_owned());
     }
     match xs_groups.len() {
       0 => unreachable!("does not work with empty list in ternary-tree"),
@@ -1162,11 +1175,9 @@ where
       _ => {
         let mut ys: Vec<TernaryTree<T>> = vec![];
         for x in xs_groups {
-          if !x.is_empty() {
-            ys.push(x.to_owned())
-          }
+          ys.push(x.to_owned())
         }
-        let mut result = Self::rebuild_list(ys.len(), 0, &ys);
+        let mut result = Self::rebuild_list(ys.len(), 0, &ys, 2);
         if let Err(msg) = result.maybe_reblance() {
           println!("[warning] {}", msg)
         }
@@ -1175,54 +1186,42 @@ where
     }
   }
   pub fn check_structure(&self) -> Result<(), String> {
-    if self.is_empty() {
-      Ok(())
-    } else {
-      match self {
-        Leaf { .. } => Ok(()),
-        Branch2 { left, middle, size, depth } => {
-          if !self.is_empty() && *size == 0 {
-            return Err(String::from("branch but has size"));
-          }
-
-          if *size != left.len() + middle.len() {
-            return Err(format!("Bad size at branch {}", self.format_inline()));
-          }
-
-          if *depth != decide_parent_depth_2(left, middle) {
-            return Err(format!("Bad depth at branch {}", self.format_inline()));
-          }
-
-          left.check_structure()?;
-          middle.check_structure()?;
-
-          Ok(())
+    match self {
+      Leaf { .. } => Ok(()),
+      Branch2 { left, middle, size, depth } => {
+        if *size != left.len() + middle.len() {
+          return Err(format!("Bad size at branch {}", self.format_inline()));
         }
-        Branch3 {
-          left,
-          middle,
-          right,
-          size,
-          depth,
-        } => {
-          if !self.is_empty() && *size == 0 {
-            return Err(String::from("branch but has size"));
-          }
 
-          if *size != left.len() + middle.len() + right.len() {
-            return Err(format!("Bad size at branch {}", self.format_inline()));
-          }
-
-          if *depth != decide_parent_depth_3(left, middle, right) {
-            return Err(format!("Bad depth at branch {}", self.format_inline()));
-          }
-
-          left.check_structure()?;
-          middle.check_structure()?;
-          right.check_structure()?;
-
-          Ok(())
+        if *depth != decide_parent_depth_2(left, middle) {
+          return Err(format!("Bad depth at branch {}", self.format_inline()));
         }
+
+        left.check_structure()?;
+        middle.check_structure()?;
+
+        Ok(())
+      }
+      Branch3 {
+        left,
+        middle,
+        right,
+        size,
+        depth,
+      } => {
+        if *size != left.len() + middle.len() + right.len() {
+          return Err(format!("Bad size at branch {}", self.format_inline()));
+        }
+
+        if *depth != decide_parent_depth_3(left, middle, right) {
+          return Err(format!("Bad depth at branch {}", self.format_inline()));
+        }
+
+        left.check_structure()?;
+        middle.check_structure()?;
+        right.check_structure()?;
+
+        Ok(())
       }
     }
   }
@@ -1324,10 +1323,6 @@ where
   }
 
   pub fn reverse(&self) -> Self {
-    if self.is_empty() {
-      unreachable!("don't call reverse on empty in ternary-tree");
-    }
-
     match self {
       Leaf { .. } => self.to_owned(),
       Branch2 { left, middle, size, depth } => Branch2 {
@@ -1544,10 +1539,6 @@ fn write_leaves<T>(xs: &TernaryTree<T>, acc: &mut Vec<TernaryTree<T>>, counter: 
 where
   T: Clone + Display + Eq + PartialEq + Debug + Ord + PartialOrd + Hash,
 {
-  if xs.is_empty() {
-    return;
-  }
-
   match xs {
     Leaf { .. } => {
       let idx = counter.take();
@@ -1567,7 +1558,7 @@ where
   }
 }
 
-fn triple_size(t: i8) -> usize {
+fn triple_size(t: u8) -> usize {
   let n: usize = 3;
   n.pow(t as u32)
 }
