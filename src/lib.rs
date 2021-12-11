@@ -24,7 +24,7 @@ use std::sync::Arc;
 
 pub use tree::TernaryTree;
 
-use crate::tree::{FingerMark, TernaryTree::*};
+use crate::tree::TernaryTree::*;
 
 #[derive(Clone, Debug)]
 pub enum TernaryTreeList<T> {
@@ -416,7 +416,7 @@ where
         ys.push(Leaf(Arc::new(x.to_owned())))
       }
 
-      TernaryTreeList::Tree(TernaryTree::rebuild_list(xs.len(), 0, &ys, FingerMark::default()))
+      TernaryTreeList::Tree(TernaryTree::rebuild_list(xs.len(), 0, &ys, 2))
     }
   }
 }
@@ -434,7 +434,7 @@ where
         ys.push(Leaf(Arc::new(x.to_owned())))
       }
 
-      TernaryTreeList::Tree(TernaryTree::rebuild_list(xs.len(), 0, &ys, FingerMark::default()))
+      TernaryTreeList::Tree(TernaryTree::rebuild_list(xs.len(), 0, &ys, 2))
     }
   }
 }
@@ -453,7 +453,7 @@ where
         ys.push(Leaf(Arc::new(x.to_owned())))
       }
 
-      TernaryTreeList::Tree(TernaryTree::rebuild_list(xs.len(), 0, &ys, FingerMark::default()))
+      TernaryTreeList::Tree(TernaryTree::rebuild_list(xs.len(), 0, &ys, 2))
     }
   }
 }
