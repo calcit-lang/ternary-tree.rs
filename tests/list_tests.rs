@@ -33,6 +33,8 @@ fn init_list_push_right() -> Result<(), String> {
   for idx in 1..200 {
     data.push(idx);
     tree = tree.push_right(idx);
+    // println!("left  {}", tree.format_inline());
+    // println!("right {}", TernaryTreeList::from(data.to_owned()).format_inline());
     assert_eq!(tree, TernaryTreeList::from(data.to_owned()))
   }
   Ok(())
