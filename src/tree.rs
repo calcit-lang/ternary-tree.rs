@@ -59,7 +59,7 @@ where
   /// make list again from existed
   /// use a factor to control side branches to be shallow with smaller depth
   /// root node has a factor of 2
-  pub fn rebuild_list(size: usize, offset: usize, xs: &[TernaryTree<T>], factor: i8) -> Self {
+  pub fn rebuild_list(size: usize, offset: usize, xs: &[TernaryTree<T>], factor: u8) -> Self {
     match size {
       0 => unreachable!("Does not work for empty list"),
       1 => xs[offset].to_owned(),
@@ -916,7 +916,7 @@ where
   }
 
   // for main branches detect keep a finger-tree like shallow-deep-shallow shape
-  fn push_right_main(&self, item: Self, n: i8) -> Self {
+  fn push_right_main(&self, item: Self, n: u8) -> Self {
     // println!("  iter: {} {:?}", self.format_inline(), mark);
 
     if self.len() + item.len() <= triple_size(n) {
@@ -1562,7 +1562,7 @@ where
   }
 }
 
-fn triple_size(t: i8) -> usize {
+fn triple_size(t: u8) -> usize {
   let n: usize = 3;
   n.pow(t as u32)
 }
