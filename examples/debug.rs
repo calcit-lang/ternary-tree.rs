@@ -48,7 +48,7 @@ pub fn main() -> Result<(), String> {
   // }
 
   let mut data: Vec<usize> = vec![];
-  for idx in 0..70 {
+  for idx in 0..110 {
     data.push(idx);
     let tree = TernaryTreeList::from(&data);
     println!("{}", tree.format_inline());

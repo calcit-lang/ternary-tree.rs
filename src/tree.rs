@@ -922,14 +922,8 @@ where
     if self.len() + item.len() <= triple_size(n) {
       self.push_right_side(item)
     } else {
-      let item_size = item.len();
       match self {
-        Leaf(a) => Branch2 {
-          size: 1 + item.len(),
-          depth: item.get_depth() + 1,
-          left: Arc::new(Leaf(a.to_owned())),
-          middle: Arc::new(item),
-        },
+        Leaf(_) => self.push_right_side(item),
         Branch2 { size, left, middle, .. } => {
           if middle.len() + item.len() > triple_size(n) {
             Branch3 {
@@ -942,6 +936,7 @@ where
           } else {
             // pile items in the compact way like in sides
             // println!("    try n: {}", n);
+            let item_size = item.len();
             let changed_branch = middle.push_right_side(item);
 
             Branch2 {
@@ -956,7 +951,7 @@ where
           size, left, middle, right, ..
         } => {
           // println!("    b3 n: {}", n);
-          if right.len() + item.len() > triple_size(n) {
+          if right.len() + item.len() > triple_size(n - 1) {
             let changed_branch = middle.push_right_main((**right).to_owned(), n + 1);
             Branch3 {
               size: left.len() + changed_branch.len() + item.len(),
@@ -966,6 +961,7 @@ where
               right: Arc::new(item),
             }
           } else {
+            let item_size = item.len();
             let changed_branch = right.push_right_side(item);
             Branch3 {
               size: size + item_size,
