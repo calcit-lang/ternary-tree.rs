@@ -1,5 +1,4 @@
 use std::cell::RefCell;
-use std::cmp;
 use std::cmp::Ordering;
 use std::fmt;
 use std::fmt::{Debug, Display};
@@ -7,7 +6,7 @@ use std::hash::{Hash, Hasher};
 use std::ops::Index;
 use std::sync::Arc;
 
-use crate::util::{divide_ternary_sizes, rough_int_pow};
+use crate::util::divide_ternary_sizes;
 
 /// internal tree structure without empty nodes
 #[derive(Clone, Debug)]
@@ -15,13 +14,11 @@ pub enum TernaryTree<T> {
   Leaf(Arc<T>),
   Branch2 {
     size: usize,
-    depth: u16,
     left: Arc<TernaryTree<T>>,
     middle: Arc<TernaryTree<T>>,
   },
   Branch3 {
     size: usize,
-    depth: u16,
     left: Arc<TernaryTree<T>>,
     middle: Arc<TernaryTree<T>>,
     right: Arc<TernaryTree<T>>,
@@ -34,15 +31,6 @@ impl<'a, T> TernaryTree<T>
 where
   T: Clone + Display + Eq + PartialEq + Debug + Ord + PartialOrd + Hash,
 {
-  /// just get, will not compute recursively
-  pub fn get_depth(&self) -> u16 {
-    match self {
-      Leaf { .. } => 0,
-      Branch2 { depth, .. } => *depth,
-      Branch3 { depth, .. } => *depth,
-    }
-  }
-
   pub fn len(&self) -> usize {
     match self {
       Leaf { .. } => 1,
@@ -76,7 +64,6 @@ where
 
           Branch3 {
             size,
-            depth: decide_parent_depth_3(&left, &middle, &right),
             left: Arc::new(left),
             middle: Arc::new(middle),
             right: Arc::new(right),
@@ -100,7 +87,6 @@ where
           size: left.len() + middle.len(),
           left: Arc::new(left.to_owned()),
           middle: Arc::new(middle.to_owned()),
-          depth: decide_parent_depth_2(left, middle),
         }
       }
       3 => {
@@ -112,7 +98,6 @@ where
           left: Arc::new(left.to_owned()),
           middle: Arc::new(middle.to_owned()),
           right: Arc::new(right.to_owned()),
-          depth: decide_parent_depth_3(left, middle, right),
         }
       }
       _ => {
@@ -124,7 +109,6 @@ where
 
         Branch3 {
           size: left.len() + middle.len() + right.len(),
-          depth: decide_parent_depth_3(&left, &middle, &right),
           left: Arc::new(left),
           middle: Arc::new(middle),
           right: Arc::new(right),
@@ -389,7 +373,6 @@ where
           let changed_branch = left.assoc(idx, item)?;
           Ok(Branch2 {
             size: size.to_owned(),
-            depth: decide_parent_depth_2(&changed_branch, middle),
             left: Arc::new(changed_branch),
             middle: middle.to_owned(),
           })
@@ -397,7 +380,6 @@ where
           let changed_branch = middle.assoc(idx - left.len(), item)?;
           Ok(Branch2 {
             size: size.to_owned(),
-            depth: decide_parent_depth_2(left, &changed_branch),
             left: left.to_owned(),
             middle: Arc::new(changed_branch),
           })
@@ -418,7 +400,6 @@ where
           let changed_branch = left.assoc(idx, item)?;
           Ok(Branch3 {
             size: size.to_owned(),
-            depth: decide_parent_depth_3(&changed_branch, middle, right),
             left: Arc::new(changed_branch),
             middle: middle.to_owned(),
             right: right.to_owned(),
@@ -427,7 +408,6 @@ where
           let changed_branch = middle.assoc(idx - left.len(), item)?;
           Ok(Branch3 {
             size: size.to_owned(),
-            depth: decide_parent_depth_3(left, &changed_branch, right),
             left: left.to_owned(),
             middle: Arc::new(changed_branch),
             right: right.to_owned(),
@@ -436,7 +416,6 @@ where
           let changed_branch = right.assoc(idx - left.len() - middle.len(), item)?;
           Ok(Branch3 {
             size: size.to_owned(),
-            depth: decide_parent_depth_3(left, middle, &changed_branch),
             left: left.to_owned(),
             middle: middle.to_owned(),
             right: Arc::new(changed_branch.to_owned()),
@@ -471,7 +450,6 @@ where
             let changed_branch = left.dissoc(idx)?;
             Ok(Branch2 {
               size: *size - 1,
-              depth: decide_parent_depth_2(&changed_branch, middle),
               left: Arc::new(changed_branch),
               middle: middle.to_owned(),
             })
@@ -482,7 +460,6 @@ where
           let changed_branch = middle.dissoc(idx - left.len())?;
           Ok(Branch2 {
             size: *size - 1,
-            depth: decide_parent_depth_2(left, &changed_branch),
             left: left.to_owned(),
             middle: Arc::new(changed_branch),
           })
@@ -504,7 +481,6 @@ where
           if left.len() == 1 {
             Ok(Branch2 {
               size: *size - 1,
-              depth: decide_parent_depth_2(middle, right),
               left: middle.to_owned(),
               middle: right.to_owned(),
             })
@@ -512,7 +488,6 @@ where
             let changed_branch = left.dissoc(idx)?;
             Ok(Branch3 {
               size: *size - 1,
-              depth: decide_parent_depth_3(&changed_branch, middle, right),
               left: Arc::new(changed_branch),
               middle: middle.to_owned(),
               right: right.to_owned(),
@@ -522,7 +497,6 @@ where
           if middle.len() == 1 {
             Ok(Branch2 {
               size: *size - 1,
-              depth: decide_parent_depth_2(left, right),
               left: left.to_owned(),
               middle: right.to_owned(),
             })
@@ -530,7 +504,6 @@ where
             let changed_branch = middle.dissoc(idx - left.len())?;
             Ok(Branch3 {
               size: *size - 1,
-              depth: decide_parent_depth_3(left, &changed_branch, right),
               left: left.to_owned(),
               middle: Arc::new(changed_branch),
               right: right.to_owned(),
@@ -539,7 +512,6 @@ where
         } else if right.len() == 1 {
           Ok(Branch2 {
             size: *size - 1,
-            depth: decide_parent_depth_2(left, middle),
             left: left.to_owned(),
             middle: middle.to_owned(),
           })
@@ -547,7 +519,6 @@ where
           let changed_branch = right.dissoc(idx - left.len() - middle.len())?;
           Ok(Branch3 {
             size: *size - 1,
-            depth: decide_parent_depth_3(left, middle, &changed_branch),
             left: left.to_owned(),
             middle: middle.to_owned(),
             right: Arc::new(changed_branch.to_owned()),
@@ -576,14 +547,12 @@ where
       Leaf { .. } => {
         if after {
           Ok(Branch2 {
-            depth: 1,
             size: 2,
             left: Arc::new(self.to_owned()),
             middle: Arc::new(Leaf(Arc::new(item))),
           })
         } else {
           Ok(Branch2 {
-            depth: 1,
             size: 2,
             left: Arc::new(Leaf(Arc::new(item))),
             middle: Arc::new(self.to_owned()),
@@ -591,22 +560,18 @@ where
         }
       }
 
-      Branch2 {
-        left, middle, size, depth, ..
-      } => {
+      Branch2 { left, middle, size, .. } => {
         if self.len() == 1 {
           if after {
             // in compact mode, values placed at left
             return Ok(Branch2 {
               size: 2,
-              depth: 1,
               left: left.to_owned(),
               middle: Arc::new(Leaf(Arc::new(item))),
             });
           } else {
             return Ok(Branch2 {
               size: 2,
-              depth: 1,
               left: Arc::new(Leaf(Arc::new(item))),
               middle: left.to_owned(),
             });
@@ -618,7 +583,6 @@ where
             if idx == 0 {
               return Ok(Branch3 {
                 size: 3,
-                depth: 1,
                 left: left.to_owned(),
                 middle: Arc::new(Leaf(Arc::new(item))),
                 right: middle.to_owned(),
@@ -627,7 +591,6 @@ where
             if idx == 1 {
               return Ok(Branch3 {
                 size: 3,
-                depth: 1,
                 left: left.to_owned(),
                 middle: middle.to_owned(),
                 right: Arc::new(Leaf(Arc::new(item))),
@@ -638,7 +601,6 @@ where
           } else if idx == 0 {
             return Ok(Branch3 {
               size: 3,
-              depth: 1,
               left: Arc::new(Leaf(Arc::new(item))),
               middle: left.to_owned(),
               right: middle.to_owned(),
@@ -646,7 +608,6 @@ where
           } else if idx == 1 {
             return Ok(Branch3 {
               size: 3,
-              depth: 1,
               left: left.to_owned(),
               middle: Arc::new(Leaf(Arc::new(item))),
               right: middle.to_owned(),
@@ -665,7 +626,6 @@ where
         if idx == 0 && !after {
           return Ok(Branch3 {
             size: *size + 1,
-            depth: *depth,
             left: Arc::new(Leaf(Arc::new(item))),
             middle: left.to_owned(),
             right: middle.to_owned(),
@@ -675,7 +635,6 @@ where
         if idx == *size - 1 && after {
           return Ok(Branch3 {
             size: *size + 1,
-            depth: *depth,
             left: left.to_owned(),
             middle: middle.to_owned(),
             right: Arc::new(Leaf(Arc::new(item))),
@@ -686,7 +645,6 @@ where
           let changed_branch = left.insert(idx, item, after)?;
           Ok(Branch2 {
             size: *size + 1,
-            depth: decide_parent_depth_2(&changed_branch, middle),
             left: Arc::new(changed_branch),
             middle: middle.to_owned(),
           })
@@ -695,33 +653,25 @@ where
 
           Ok(Branch2 {
             size: *size + 1,
-            depth: decide_parent_depth_2(left, &changed_branch.to_owned()),
             left: left.to_owned(),
             middle: Arc::new(changed_branch),
           })
         }
       }
       Branch3 {
-        left,
-        middle,
-        right,
-        size,
-        depth,
-        ..
+        left, middle, right, size, ..
       } => {
         if self.len() == 1 {
           if after {
             // in compact mode, values placed at left
             return Ok(Branch2 {
               size: 2,
-              depth: 1,
               left: left.to_owned(),
               middle: Arc::new(Leaf(Arc::new(item))),
             });
           } else {
             return Ok(Branch2 {
               size: 2,
-              depth: 1,
               left: Arc::new(Leaf(Arc::new(item))),
               middle: left.to_owned(),
             });
@@ -733,7 +683,6 @@ where
             if idx == 0 {
               return Ok(Branch3 {
                 size: 3,
-                depth: 1,
                 left: left.to_owned(),
                 middle: Arc::new(Leaf(Arc::new(item))),
                 right: middle.to_owned(),
@@ -742,7 +691,6 @@ where
             if idx == 1 {
               return Ok(Branch3 {
                 size: 3,
-                depth: 1,
                 left: left.to_owned(),
                 middle: middle.to_owned(),
                 right: Arc::new(Leaf(Arc::new(item))),
@@ -753,7 +701,6 @@ where
           } else if idx == 0 {
             return Ok(Branch3 {
               size: 3,
-              depth: 1,
               left: Arc::new(Leaf(Arc::new(item))),
               middle: left.to_owned(),
               right: middle.to_owned(),
@@ -761,7 +708,6 @@ where
           } else if idx == 1 {
             return Ok(Branch3 {
               size: 3,
-              depth: 1,
               left: left.to_owned(),
               middle: Arc::new(Leaf(Arc::new(item))),
               right: middle.to_owned(),
@@ -780,7 +726,6 @@ where
         if idx == 0 && !after && left.len() >= middle.len() && left.len() >= right.len() {
           return Ok(Branch2 {
             size: *size + 1,
-            depth: depth + 1,
             left: Arc::new(Leaf(Arc::new(item))),
             middle: Arc::new(self.to_owned()),
           });
@@ -789,7 +734,6 @@ where
         if idx == *size - 1 && after && right.len() >= middle.len() && right.len() >= left.len() {
           return Ok(Branch2 {
             size: *size + 1,
-            depth: depth + 1,
             left: Arc::new(self.to_owned()),
             middle: Arc::new(Leaf(Arc::new(item))),
           });
@@ -798,7 +742,6 @@ where
         if after && idx == *size - 1 && right.len() == 0 && middle.len() >= left.len() {
           return Ok(Branch3 {
             size: *size + 1,
-            depth: depth.to_owned(),
             left: left.to_owned(),
             middle: middle.to_owned(),
             right: Arc::new(Leaf(Arc::new(item))),
@@ -808,7 +751,6 @@ where
         if !after && idx == 0 && right.len() == 0 && middle.len() >= right.len() {
           return Ok(Branch3 {
             size: *size + 1,
-            depth: depth.to_owned(),
             left: Arc::new(Leaf(Arc::new(item))),
             middle: left.to_owned(),
             right: middle.to_owned(),
@@ -819,7 +761,6 @@ where
           let changed_branch = left.insert(idx, item, after)?;
           Ok(Branch3 {
             size: *size + 1,
-            depth: decide_parent_depth_3(&changed_branch, middle, right),
             left: Arc::new(changed_branch.to_owned()),
             middle: middle.to_owned(),
             right: right.to_owned(),
@@ -829,7 +770,6 @@ where
 
           Ok(Branch3 {
             size: *size + 1,
-            depth: decide_parent_depth_3(left, &changed_branch.to_owned(), right),
             left: left.to_owned(),
             middle: Arc::new(changed_branch.to_owned()),
             right: right.to_owned(),
@@ -839,7 +779,6 @@ where
 
           Ok(Branch3 {
             size: *size + 1,
-            depth: decide_parent_depth_3(left, middle, &changed_branch),
             left: left.to_owned(),
             middle: middle.to_owned(),
             right: Arc::new(changed_branch.to_owned()),
@@ -860,59 +799,24 @@ where
     *self = Self::rebuild_list(ys.len(), 0, &ys, 2);
     Ok(())
   }
-  // TODO, need better strategy for detecting
-  pub fn maybe_reblance(&mut self) -> Result<(), String> {
-    match self {
-      Leaf(..) => Ok(()),
-      Branch2 { .. } => Ok(()),
-      Branch3 { size, .. } => {
-        // guessed number
-        if *size < 81 {
-          Ok(())
-        } else {
-          let current_depth = self.get_depth();
-          if current_depth > 20 && rough_int_pow(3, current_depth - 20) > self.len() {
-            self.force_inplace_balancing()
-          } else {
-            Ok(())
-          }
-        }
-      }
-    }
-  }
 
   pub fn unshift(&self, item: T) -> Self {
-    self.prepend(item, false)
+    self.prepend(item)
   }
-  pub fn prepend(&self, item: T, disable_balancing: bool) -> Self {
-    let mut result = match self.insert(0, item, false) {
+  pub fn prepend(&self, item: T) -> Self {
+    match self.insert(0, item, false) {
       Ok(v) => v,
       Err(e) => unreachable!(e),
-    };
-
-    if !disable_balancing {
-      if let Err(msg) = result.maybe_reblance() {
-        println!("[warning] {}", msg)
-      }
     }
-
-    result
   }
   pub fn push(&self, item: T) -> Self {
-    self.append(item, false)
+    self.append(item)
   }
-  pub fn append(&self, item: T, disable_balancing: bool) -> Self {
-    let mut result = match self.insert(self.len() - 1, item, true) {
+  pub fn append(&self, item: T) -> Self {
+    match self.insert(self.len() - 1, item, true) {
       Ok(v) => v,
       Err(e) => unreachable!(e),
-    };
-
-    if !disable_balancing {
-      if let Err(msg) = result.maybe_reblance() {
-        println!("[warning] {}", msg)
-      }
     }
-    result
   }
 
   // for main branches detect keep a finger-tree like shallow-deep-shallow shape
@@ -928,7 +832,6 @@ where
           if middle.len() + item.len() > triple_size(n) {
             Branch3 {
               size: size + item.len(),
-              depth: decide_parent_depth_3(left, middle, &item),
               left: left.to_owned(),
               middle: middle.to_owned(),
               right: Arc::new(item),
@@ -941,7 +844,6 @@ where
 
             Branch2 {
               size: size + item_size,
-              depth: decide_parent_depth_2(left, &changed_branch),
               left: left.to_owned(),
               middle: Arc::new(changed_branch),
             }
@@ -955,7 +857,6 @@ where
             let changed_branch = middle.push_right_main((**right).to_owned(), n + 1);
             Branch3 {
               size: left.len() + changed_branch.len() + item.len(),
-              depth: decide_parent_depth_3(left, &changed_branch, &item),
               left: left.to_owned(),
               middle: Arc::new(changed_branch),
               right: Arc::new(item),
@@ -965,7 +866,6 @@ where
             let changed_branch = right.push_right_side(item);
             Branch3 {
               size: size + item_size,
-              depth: decide_parent_depth_3(left, middle, &changed_branch),
               left: left.to_owned(),
               middle: middle.to_owned(),
               right: Arc::new(changed_branch),
@@ -982,7 +882,6 @@ where
     match self {
       Leaf(a) => Branch2 {
         size: 1 + item.len(),
-        depth: item.get_depth() + 1,
         left: Arc::new(Leaf(a.to_owned())),
         middle: Arc::new(item),
       },
@@ -990,7 +889,6 @@ where
         if middle.len() + item.len() > left.len() {
           Branch3 {
             size: size + item.len(),
-            depth: decide_parent_depth_3(left, middle, &item),
             left: left.to_owned(),
             middle: middle.to_owned(),
             right: Arc::new(item),
@@ -999,7 +897,6 @@ where
           let changed_branch = middle.push_right_side(item.to_owned());
           Branch2 {
             size: size + item.len(),
-            depth: decide_parent_depth_3(left, middle, &changed_branch),
             left: left.to_owned(),
             middle: Arc::new(changed_branch),
           }
@@ -1011,7 +908,6 @@ where
         if right.len() + item.len() > middle.len() {
           Branch2 {
             size: size + item.len(),
-            depth: decide_parent_depth_2(self, &item),
             left: Arc::new(self.to_owned()),
             middle: Arc::new(item),
           }
@@ -1019,7 +915,6 @@ where
           let changed_branch = right.push_right_side(item.to_owned());
           Branch3 {
             size: size + item.len(),
-            depth: decide_parent_depth_3(left, middle, &changed_branch),
             left: left.to_owned(),
             middle: middle.to_owned(),
             right: Arc::new(changed_branch),
@@ -1051,7 +946,6 @@ where
               ..
             } => Branch3 {
               size: size - 1,
-              depth: decide_parent_depth_3(&b_left, &b_middle, middle),
               left: b_left.to_owned(),
               middle: b_middle.to_owned(),
               right: middle.to_owned(),
@@ -1064,13 +958,11 @@ where
             } => {
               let internal_branch = Branch2 {
                 size: b_middle.len() + b_right.len(),
-                depth: decide_parent_depth_2(&b_middle, &b_right),
                 left: b_middle,
                 middle: b_right,
               };
               Branch3 {
                 size: size - 1,
-                depth: decide_parent_depth_3(&b_left, &internal_branch, middle),
                 left: b_left.to_owned(),
                 middle: Arc::new(internal_branch),
                 right: middle.to_owned(),
@@ -1078,7 +970,6 @@ where
             }
             _ => Branch2 {
               size: size - 1,
-              depth: decide_parent_depth_2(&changed_branch, middle),
               left: Arc::new(changed_branch),
               middle: middle.to_owned(),
             },
@@ -1096,7 +987,6 @@ where
               ..
             } => Branch3 {
               size: size - 1,
-              depth: decide_parent_depth_3(b_left, b_middle, right),
               left: b_left.to_owned(),
               middle: b_middle.to_owned(),
               right: right.to_owned(),
@@ -1109,13 +999,11 @@ where
             } => {
               let internal_branch = Branch2 {
                 size: b_middle.len() + b_right.len(),
-                depth: decide_parent_depth_2(b_middle, b_right),
                 left: b_middle.to_owned(),
                 middle: b_right.to_owned(),
               };
               Branch3 {
                 size: size - 1,
-                depth: decide_parent_depth_3(b_left, &internal_branch, right),
                 left: b_left.to_owned(),
                 middle: Arc::new(internal_branch),
                 right: right.to_owned(),
@@ -1123,7 +1011,6 @@ where
             }
             _ => Branch2 {
               size: size - 1,
-              depth: decide_parent_depth_2(middle, right),
               left: middle.to_owned(),
               middle: right.to_owned(),
             },
@@ -1132,7 +1019,6 @@ where
           let changed_branch = left.drop_left();
           Branch3 {
             size: size - 1,
-            depth: decide_parent_depth_3(&changed_branch, middle, right),
             left: Arc::new(changed_branch),
             middle: middle.to_owned(),
             right: right.to_owned(),
@@ -1155,7 +1041,6 @@ where
         let middle = xs_groups[1].to_owned();
         TernaryTree::Branch2 {
           size: left.len() + middle.len(),
-          depth: decide_parent_depth_2(&left, &middle),
           left: Arc::new(left),
           middle: Arc::new(middle),
         }
@@ -1166,7 +1051,6 @@ where
         let right = xs_groups[2].to_owned();
         TernaryTree::Branch3 {
           size: left.len() + middle.len() + right.len(),
-          depth: decide_parent_depth_3(&left, &middle, &right),
           left: Arc::new(left),
           middle: Arc::new(middle),
           right: Arc::new(right),
@@ -1177,24 +1061,16 @@ where
         for x in xs_groups {
           ys.push(x.to_owned())
         }
-        let mut result = Self::rebuild_list(ys.len(), 0, &ys, 2);
-        if let Err(msg) = result.maybe_reblance() {
-          println!("[warning] {}", msg)
-        }
-        result
+        Self::rebuild_list(ys.len(), 0, &ys, 2)
       }
     }
   }
   pub fn check_structure(&self) -> Result<(), String> {
     match self {
       Leaf { .. } => Ok(()),
-      Branch2 { left, middle, size, depth } => {
+      Branch2 { left, middle, size } => {
         if *size != left.len() + middle.len() {
           return Err(format!("Bad size at branch {}", self.format_inline()));
-        }
-
-        if *depth != decide_parent_depth_2(left, middle) {
-          return Err(format!("Bad depth at branch {}", self.format_inline()));
         }
 
         left.check_structure()?;
@@ -1202,19 +1078,9 @@ where
 
         Ok(())
       }
-      Branch3 {
-        left,
-        middle,
-        right,
-        size,
-        depth,
-      } => {
+      Branch3 { left, middle, right, size } => {
         if *size != left.len() + middle.len() + right.len() {
           return Err(format!("Bad size at branch {}", self.format_inline()));
-        }
-
-        if *depth != decide_parent_depth_3(left, middle, right) {
-          return Err(format!("Bad depth at branch {}", self.format_inline()));
         }
 
         left.check_structure()?;
@@ -1261,7 +1127,6 @@ where
 
           Ok(TernaryTree::Branch2 {
             size: left_cut.len() + middle_cut.len(),
-            depth: decide_parent_depth_2(&left_cut, &middle_cut),
             left: Arc::new(left_cut),
             middle: Arc::new(middle_cut),
           })
@@ -1283,7 +1148,6 @@ where
 
             Ok(TernaryTree::Branch2 {
               size: middle_cut.len() + right_cut.len(),
-              depth: decide_parent_depth_2(&middle_cut, &right_cut),
               left: Arc::new(middle_cut),
               middle: Arc::new(right_cut),
             })
@@ -1296,7 +1160,6 @@ where
 
           Ok(TernaryTree::Branch2 {
             size: left_cut.len() + middle_cut.len(),
-            depth: decide_parent_depth_2(&left_cut, &middle_cut),
             left: Arc::new(left_cut),
             middle: Arc::new(middle_cut),
           })
@@ -1305,7 +1168,6 @@ where
           let right_cut = right.slice(0, end_idx - base2)?;
           Ok(TernaryTree::Branch3 {
             size: left_cut.len() + middle.len() + right_cut.len(),
-            depth: decide_parent_depth_3(&left_cut, middle, &right_cut),
             left: Arc::new(left_cut),
             middle: middle.clone(),
             right: Arc::new(right_cut),
@@ -1325,21 +1187,14 @@ where
   pub fn reverse(&self) -> Self {
     match self {
       Leaf { .. } => self.to_owned(),
-      Branch2 { left, middle, size, depth } => Branch2 {
+      Branch2 { left, middle, size } => Branch2 {
         size: *size,
-        depth: *depth,
         left: Arc::new(middle.reverse()),
         middle: Arc::new(left.reverse()),
       },
-      Branch3 {
-        left,
-        middle,
-        right,
-        size,
-        depth,
-      } => Branch3 {
+      Branch3 { left, middle, right, size } => Branch3 {
         size: *size,
-        depth: *depth,
+
         left: Arc::new(right.reverse()),
         middle: Arc::new(middle.reverse()),
         right: Arc::new(left.reverse()),
@@ -1349,21 +1204,13 @@ where
   pub fn map<V>(&self, f: Arc<dyn Fn(&T) -> V>) -> TernaryTree<V> {
     match self {
       Leaf(value) => Leaf(Arc::new(f(value))),
-      Branch2 { left, middle, size, depth } => Branch2 {
+      Branch2 { left, middle, size } => Branch2 {
         size: *size,
-        depth: *depth,
         left: Arc::new(left.map(f.clone())),
         middle: Arc::new(middle.map(f.clone())),
       },
-      Branch3 {
-        left,
-        middle,
-        right,
-        size,
-        depth,
-      } => Branch3 {
+      Branch3 { left, middle, right, size } => Branch3 {
         size: *size,
-        depth: *depth,
         left: Arc::new(left.map(f.clone())),
         middle: Arc::new(middle.map(f.clone())),
         right: Arc::new(right.map(f.clone())),
@@ -1385,24 +1232,6 @@ where
   pub fn iter(&self) -> TernaryTreeRefIntoIterator<T> {
     TernaryTreeRefIntoIterator { value: self, index: 0 }
   }
-}
-
-// pass several children here
-fn decide_parent_depth_2<T: Clone + Display + Eq + PartialEq + Debug + Ord + PartialOrd + Hash>(
-  x0: &TernaryTree<T>,
-  x1: &TernaryTree<T>,
-) -> u16 {
-  cmp::max(x0.get_depth(), x1.get_depth()) + 1
-}
-
-// pass several children here
-fn decide_parent_depth_3<T: Clone + Display + Eq + PartialEq + Debug + Ord + PartialOrd + Hash>(
-  x0: &TernaryTree<T>,
-  x1: &TernaryTree<T>,
-  x2: &TernaryTree<T>,
-) -> u16 {
-  // println!("{} {} {}", x0.get_depth(), x1.get_depth(), x2.get_depth());
-  cmp::max(cmp::max(x0.get_depth(), x1.get_depth()), x2.get_depth()) + 1
 }
 
 impl<T> Display for TernaryTree<T>

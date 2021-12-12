@@ -18,7 +18,7 @@ fn criterion_benchmark(c: &mut Criterion) {
       let mut data = TernaryTreeList::Empty;
 
       for idx in 0..1000 {
-        data = data.append(idx, true)
+        data = data.append(idx)
       }
     })
   });
