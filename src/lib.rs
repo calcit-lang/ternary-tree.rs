@@ -38,14 +38,6 @@ impl<'a, T> TernaryTreeList<T>
 where
   T: Clone + Display + Eq + PartialEq + Debug + Ord + PartialOrd + Hash,
 {
-  /// just get, will not compute recursively
-  pub fn get_depth(&self) -> u16 {
-    match self {
-      Empty => 0,
-      Tree(t) => t.get_depth(),
-    }
-  }
-
   pub fn is_empty(&self) -> bool {
     match self {
       Empty => true,
@@ -186,29 +178,22 @@ where
     }
   }
 
-  pub fn maybe_reblance(&mut self) -> Result<(), String> {
-    match self {
-      Empty => Ok(()),
-      Tree(t) => t.maybe_reblance(),
-    }
-  }
-
   pub fn unshift(&self, item: T) -> Self {
-    self.prepend(item, false)
+    self.prepend(item)
   }
-  pub fn prepend(&self, item: T, disable_balancing: bool) -> Self {
+  pub fn prepend(&self, item: T) -> Self {
     match self {
       Empty => TernaryTreeList::Tree(TernaryTree::Leaf(Arc::new(item))),
-      Tree(t) => TernaryTreeList::Tree(t.prepend(item, disable_balancing)),
+      Tree(t) => TernaryTreeList::Tree(t.prepend(item)),
     }
   }
   pub fn push(&self, item: T) -> Self {
-    self.append(item, false)
+    self.append(item)
   }
-  pub fn append(&self, item: T, disable_balancing: bool) -> Self {
+  pub fn append(&self, item: T) -> Self {
     match self {
       Empty => TernaryTreeList::Tree(TernaryTree::Leaf(Arc::new(item))),
-      Tree(t) => TernaryTreeList::Tree(t.append(item, disable_balancing)),
+      Tree(t) => TernaryTreeList::Tree(t.append(item)),
     }
   }
   pub fn push_right(&self, item: T) -> Self {

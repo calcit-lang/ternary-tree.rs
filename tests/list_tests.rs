@@ -1,3 +1,5 @@
+extern crate im_ternary_tree;
+
 use im_ternary_tree::TernaryTreeList;
 use std::sync::Arc;
 
@@ -139,8 +141,8 @@ fn list_insertions() -> Result<(), String> {
   assert_eq!(data4.assoc_before(3, 10)?.format_inline(), "(1 (2 3) (10 4))");
   assert_eq!(data4.assoc_after(3, 10)?.format_inline(), "(1 (2 3) (4 10))");
 
-  assert_eq!(data4.prepend(10, false).format_inline(), "((10 1) (2 3) 4)");
-  assert_eq!(data4.append(10, false).format_inline(), "(1 (2 3) (4 10))");
+  assert_eq!(data4.prepend(10).format_inline(), "((10 1) (2 3) 4)");
+  assert_eq!(data4.append(10).format_inline(), "(1 (2 3) (4 10))");
 
   Ok(())
 }
@@ -184,7 +186,7 @@ fn check_equality() -> Result<(), String> {
   let origin4 = [1, 2, 3, 4];
   let data4 = TernaryTreeList::from(&origin4);
   let data4n = TernaryTreeList::from(&origin4);
-  let data4_made = TernaryTreeList::from(&[2, 3, 4]).prepend(1, false);
+  let data4_made = TernaryTreeList::from(&[2, 3, 4]).prepend(1);
 
   assert!(data4.is_shape_same(&data4));
   assert!(data4.is_shape_same(&data4n));
@@ -202,7 +204,7 @@ fn check_equality() -> Result<(), String> {
 fn force_balancing() -> Result<(), String> {
   let mut data = TernaryTreeList::<usize>::from(&[]);
   for idx in 0..20 {
-    data = data.append(idx, true);
+    data = data.append(idx);
   }
   // echo data.formatInline
   assert_eq!(
@@ -247,7 +249,7 @@ fn iterator() -> Result<(), String> {
 fn check_structure() -> Result<(), String> {
   let mut data = TernaryTreeList::from(&[]);
   for idx in 0..20 {
-    data = data.append(idx, true);
+    data = data.append(idx);
   }
 
   data.check_structure()?;
@@ -264,7 +266,7 @@ fn check_structure() -> Result<(), String> {
 fn slices() -> Result<(), String> {
   let mut data = TernaryTreeList::from(&[]);
   for idx in 0..40 {
-    data = data.append(idx, true);
+    data = data.append(idx);
   }
 
   let mut list40: Vec<usize> = vec![];
