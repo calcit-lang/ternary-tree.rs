@@ -418,7 +418,7 @@ where
             size: size.to_owned(),
             left: left.to_owned(),
             middle: middle.to_owned(),
-            right: Arc::new(changed_branch.to_owned()),
+            right: Arc::new(changed_branch),
           })
         }
       }
@@ -521,7 +521,7 @@ where
             size: *size - 1,
             left: left.to_owned(),
             middle: middle.to_owned(),
-            right: Arc::new(changed_branch.to_owned()),
+            right: Arc::new(changed_branch),
           })
         }
       }
@@ -761,7 +761,7 @@ where
           let changed_branch = left.insert(idx, item, after)?;
           Ok(Branch3 {
             size: *size + 1,
-            left: Arc::new(changed_branch.to_owned()),
+            left: Arc::new(changed_branch),
             middle: middle.to_owned(),
             right: right.to_owned(),
           })
@@ -771,7 +771,7 @@ where
           Ok(Branch3 {
             size: *size + 1,
             left: left.to_owned(),
-            middle: Arc::new(changed_branch.to_owned()),
+            middle: Arc::new(changed_branch),
             right: right.to_owned(),
           })
         } else {
@@ -781,7 +781,7 @@ where
             size: *size + 1,
             left: left.to_owned(),
             middle: middle.to_owned(),
-            right: Arc::new(changed_branch.to_owned()),
+            right: Arc::new(changed_branch),
           })
         }
       }
@@ -946,8 +946,8 @@ where
               ..
             } => Branch3 {
               size: size - 1,
-              left: b_left.to_owned(),
-              middle: b_middle.to_owned(),
+              left: b_left,
+              middle: b_middle,
               right: middle.to_owned(),
             },
             Branch3 {
@@ -963,7 +963,7 @@ where
               };
               Branch3 {
                 size: size - 1,
-                left: b_left.to_owned(),
+                left: b_left,
                 middle: Arc::new(internal_branch),
                 right: middle.to_owned(),
               }
