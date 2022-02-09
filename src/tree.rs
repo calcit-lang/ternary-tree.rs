@@ -806,7 +806,7 @@ where
   pub fn prepend(&self, item: T) -> Self {
     match self.insert(0, item, false) {
       Ok(v) => v,
-      Err(e) => unreachable!(e),
+      Err(e) => unreachable!("{}", e),
     }
   }
   pub fn push(&self, item: T) -> Self {
@@ -815,7 +815,7 @@ where
   pub fn append(&self, item: T) -> Self {
     match self.insert(self.len() - 1, item, true) {
       Ok(v) => v,
-      Err(e) => unreachable!(e),
+      Err(e) => unreachable!("{}", e),
     }
   }
 
