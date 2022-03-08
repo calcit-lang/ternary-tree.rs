@@ -30,7 +30,7 @@ pub fn main() -> Result<(), String> {
     data = data.push(idx)
   }
 
-  let mut d = data.to_owned();
+  let mut d = data;
 
   while d.len() > 1 {
     d = d.drop_left();
