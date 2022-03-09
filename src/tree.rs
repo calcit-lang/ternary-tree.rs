@@ -150,33 +150,18 @@ where
         }
       }
 
-      Branch2 { left, middle, .. } => {
-        if let Some(pos) = left.find_index(f.clone()) {
-          return Some(pos);
-        }
+      Branch2 { left, middle, .. } => left
+        .find_index(f.to_owned())
+        .or_else(|| middle.find_index(f.to_owned()).map(|pos| pos + left.len() as i64)),
 
-        if let Some(pos) = middle.find_index(f.clone()) {
-          return Some(pos + left.len() as i64);
-        }
-
-        None
-      }
-
-      Branch3 { left, middle, right, .. } => {
-        if let Some(pos) = left.find_index(f.clone()) {
-          return Some(pos);
-        }
-
-        if let Some(pos) = middle.find_index(f.clone()) {
-          return Some(pos + left.len() as i64);
-        }
-
-        if let Some(pos) = right.find_index(f.clone()) {
-          return Some(pos + (left.len() as i64) + (middle.len() as i64));
-        }
-
-        None
-      }
+      Branch3 { left, middle, right, .. } => left
+        .find_index(f.to_owned())
+        .or_else(|| middle.find_index(f.to_owned()).map(|pos| pos + left.len() as i64))
+        .or_else(|| {
+          right
+            .find_index(f.to_owned())
+            .map(|pos| pos + left.len() as i64 + middle.len() as i64)
+        }),
     }
   }
 
@@ -189,22 +174,11 @@ where
           None
         }
       }
-      Branch2 { left, middle, .. } => {
-        if let Some(pos) = left.index_of(item) {
-          Some(pos)
-        } else {
-          middle.index_of(item).map(|pos| pos + left.len())
-        }
-      }
-      Branch3 { left, middle, right, .. } => {
-        if let Some(pos) = left.index_of(item) {
-          Some(pos)
-        } else if let Some(pos) = middle.index_of(item) {
-          Some(pos + left.len())
-        } else {
-          right.index_of(item).map(|pos| pos + left.len() + middle.len())
-        }
-      }
+      Branch2 { left, middle, .. } => left.index_of(item).or_else(|| middle.index_of(item).map(|pos| pos + left.len())),
+      Branch3 { left, middle, right, .. } => left
+        .index_of(item)
+        .or_else(|| middle.index_of(item).map(|pos| pos + left.len()))
+        .or_else(|| right.index_of(item).map(|pos| pos + left.len() + middle.len())),
     }
   }
 
@@ -261,14 +235,15 @@ where
         } else if idx < base + middle.len() {
           middle.ref_get(idx - base)
         } else {
-          right.ref_get(idx - left.len() - middle.len())
+          right.ref_get(idx - base - middle.len())
         }
       }
       Branch2 { left, middle, .. } => {
-        if idx < left.len() {
+        let base = left.len();
+        if idx < base {
           left.ref_get(idx)
         } else {
-          middle.ref_get(idx - left.len())
+          middle.ref_get(idx - base)
         }
       }
       Leaf(value) => Some(value),

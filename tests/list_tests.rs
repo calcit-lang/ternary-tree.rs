@@ -229,7 +229,7 @@ fn iterator() -> Result<(), String> {
   let data4 = TernaryTreeList::from(&origin4);
 
   let mut i = 0;
-  for _ in &data4.to_owned() {
+  for _ in &data4 {
     i += 1;
   }
 
