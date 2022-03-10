@@ -404,7 +404,7 @@ where
       return Err(format!("Index too large {} for {}", idx, self.len()));
     } else if self.len() == 1 {
       // idx already == 0
-      return Err(String::from("Cannot remove from singleton list"));
+      return Err(String::from("Cannot remove from singleton list to empty"));
     }
 
     match self {

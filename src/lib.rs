@@ -129,7 +129,13 @@ where
   pub fn dissoc(&self, idx: usize) -> Result<Self, String> {
     match self {
       Empty => Err(String::from("calling dissoc from empty")),
-      Tree(t) => Ok(TernaryTreeList::Tree(t.dissoc(idx)?)),
+      Tree(t) => {
+        if idx == 0 && t.len() == 1 {
+          Ok(TernaryTreeList::Empty)
+        } else {
+          Ok(TernaryTreeList::Tree(t.dissoc(idx)?))
+        }
+      }
     }
   }
   pub fn rest(&self) -> Result<Self, String> {
