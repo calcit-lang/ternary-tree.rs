@@ -47,12 +47,16 @@ pub fn main() -> Result<(), String> {
   //   }
   // }
 
-  let mut data: Vec<usize> = vec![];
-  for idx in 0..110 {
-    data.push(idx);
-    let tree = TernaryTreeList::from(&data);
-    println!("{}", tree.format_inline());
-  }
+  // let mut data: Vec<usize> = vec![];
+  // for idx in 0..110 {
+  //   data.push(idx);
+  //   let tree = TernaryTreeList::from(&data);
+  //   println!("{}", tree.format_inline());
+  // }
+
+  let mut data: TernaryTreeList<usize> = TernaryTreeList::Empty;
+  data = data.push_right(0);
+  let _e = data.dissoc(0)?;
 
   Ok(())
 }

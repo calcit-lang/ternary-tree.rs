@@ -360,3 +360,12 @@ fn take_skip() -> Result<(), String> {
 
   Ok(())
 }
+
+#[test]
+fn dissoc_empty() -> Result<(), String> {
+  let data = TernaryTreeList::from(&[1]);
+
+  assert_eq!(data.dissoc(0).unwrap(), TernaryTreeList::Empty);
+
+  Ok(())
+}
