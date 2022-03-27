@@ -30,8 +30,8 @@ assert_eq!(updated.unsafe_get(3), 10);
 
 Videos:
 
-- tree layout from 1 to 59 https://www.bilibili.com/video/BV1or4y1U7u2/
-- ideas explained in Chinese https://www.bilibili.com/video/BV1z44y1a7a6/
+- tree layout from 0 to 159 https://www.bilibili.com/video/BV1F34y147V7
+- 方案设计的中文介绍 https://www.bilibili.com/video/BV1z44y1a7a6/
 
 This library has special optimizations on `push_right` and `pop_left` with tricks from [finger-tree](https://en.wikipedia.org/wiki/Finger_tree).
 
