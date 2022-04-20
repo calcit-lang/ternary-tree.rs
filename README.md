@@ -1,12 +1,14 @@
-## Structrual sharing tree in Rust
+## Structrual sharing tree for Calcit
 
-https://img.shields.io/crates/v/im_ternary_tree?style=flat-square
+> borrowed ideas from 2-3 tree and finger-tree.
 
-> Actually an unbalanced 2-3 tree with tricks like finger-tree.
+Demostrating tree layout from 0 to 159 https://www.bilibili.com/video/BV1F34y147V7
+
+![ternary-tree illustrated](assets/ternary-tree-demo.jpeg)
 
 ### Usage
 
-![](https://img.shields.io/crates/v/im_ternary_tree?style=flat-square)
+![crate](https://img.shields.io/crates/v/im_ternary_tree?style=flat-square)
 
 Docs https://docs.rs/im_ternary_tree/ .
 
@@ -28,10 +30,7 @@ assert_eq!(updated.unsafe_get(3), 10);
 
 ### Optimizations
 
-Videos:
-
-- tree layout from 0 to 159 https://www.bilibili.com/video/BV1F34y147V7
-- 方案设计的中文介绍 https://www.bilibili.com/video/BV1z44y1a7a6/
+方案设计的中文介绍 https://www.bilibili.com/video/BV1z44y1a7a6/
 
 This library has special optimizations on `push_right` and `pop_left` with tricks from [finger-tree](https://en.wikipedia.org/wiki/Finger_tree).
 
