@@ -2,7 +2,7 @@
 
 > borrowed ideas from 2-3 tree and finger-tree.
 
-Demostrating tree layout from 0 to 159 https://www.bilibili.com/video/BV1F34y147V7
+Tree layout from 0 to 159 watch [video](https://www.bilibili.com/video/BV1F34y147V7) or try [live demo](https://github.com/calcit-lang/explain-ternary-tree).
 
 ![ternary-tree illustrated](assets/ternary-tree-demo.jpeg)
 
@@ -34,47 +34,9 @@ assert_eq!(updated.unsafe_get(3), 10);
 
 This library has special optimizations on `push_right` and `pop_left` with tricks from [finger-tree](https://en.wikipedia.org/wiki/Finger_tree).
 
-For a vector of `([] 0 1 2 3 4 5 6 7)`, its internal structure is like:
+And as its size grows, it's always operating on a shallow branch at right end, wasting fewer nodes for indexing new elements, a random demo looks like:
 
-```cirru
-((0 1 2) (3 4 5) (6 7))
-```
-
-each pair of `(` and `)` represents a branch, notice that each group is size 1, 2 or 3.
-
-And as its size grows, it's always operating on a shallow branch at right end, wasting fewer nodes for indexing new elements:
-
-```cirru
-  0
- (0 1)
- (0 1 2)
-((0 1 2) 3)
-((0 1 2) (3 4))
-((0 1 2) (3 4 5))
-((0 1 2) (3 4 5) 6)
-((0 1 2) (3 4 5) (6 7))
-((0 1 2) (3 4 5) (6 7 8))
-((0 1 2) ((3 4 5) (6 7 8)) 9)
-((0 1 2) ((3 4 5) (6 7 8)) (9 10))
-((0 1 2) ((3 4 5) (6 7 8)) (9 10 11))
-((0 1 2) ((3 4 5) (6 7 8) (9 10 11)) 12)
-((0 1 2) ((3 4 5) (6 7 8) (9 10 11)) (12 13))
-((0 1 2) ((3 4 5) (6 7 8) (9 10 11)) (12 13 14))
-((0 1 2) (((3 4 5) (6 7 8) (9 10 11)) (12 13 14)) 15)
-((0 1 2) (((3 4 5) (6 7 8) (9 10 11)) (12 13 14)) (15 16))
-((0 1 2) (((3 4 5) (6 7 8) (9 10 11)) (12 13 14)) (15 16 17))
-((0 1 2) (((3 4 5) (6 7 8) (9 10 11)) ((12 13 14) (15 16 17))) 18)
-((0 1 2) (((3 4 5) (6 7 8) (9 10 11)) ((12 13 14) (15 16 17))) (18 19))
-((0 1 2) (((3 4 5) (6 7 8) (9 10 11)) ((12 13 14) (15 16 17))) (18 19 20))
-((0 1 2) (((3 4 5) (6 7 8) (9 10 11)) ((12 13 14) (15 16 17) (18 19 20))) 21)
-((0 1 2) (((3 4 5) (6 7 8) (9 10 11)) ((12 13 14) (15 16 17) (18 19 20))) (21 22))
-((0 1 2) (((3 4 5) (6 7 8) (9 10 11)) ((12 13 14) (15 16 17) (18 19 20))) (21 22 23))
-((0 1 2) (((3 4 5) (6 7 8) (9 10 11)) ((12 13 14) (15 16 17) (18 19 20)) (21 22 23)) 24)
-((0 1 2) (((3 4 5) (6 7 8) (9 10 11)) ((12 13 14) (15 16 17) (18 19 20)) (21 22 23)) (24 25))
-((0 1 2) (((3 4 5) (6 7 8) (9 10 11)) ((12 13 14) (15 16 17) (18 19 20)) (21 22 23)) (24 25 26))
-((0 1 2) (((3 4 5) (6 7 8) (9 10 11)) ((12 13 14) (15 16 17) (18 19 20)) ((21 22 23) (24 25 26))) 27)
-((0 1 2) (((3 4 5) (6 7 8) (9 10 11)) ((12 13 14) (15 16 17) (18 19 20)) ((21 22 23) (24 25 26))) (27 28))
-```
+![ternary-tree illustrated](assets/partial.png)
 
 Also the left branches are kept shallow on purpose so it can be cheaper in `pop_left`. Totally inspired by finger-tree.
 
