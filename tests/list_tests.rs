@@ -109,6 +109,24 @@ fn drop_left_data() -> Result<(), String> {
 }
 
 #[test]
+fn drop_right_data() -> Result<(), String> {
+  let mut data: Vec<usize> = vec![];
+  for idx in 0..200 {
+    data.push(idx);
+  }
+  let mut tree: TernaryTreeList<usize> = TernaryTreeList::from(data.to_owned());
+
+  // do once less than the length
+  for _ in 0..data.len() {
+    tree = tree.drop_right();
+    data.remove(data.len() - 1);
+    assert_eq!(tree, TernaryTreeList::from(data.to_owned()));
+  }
+
+  Ok(())
+}
+
+#[test]
 fn dissoc() -> Result<(), String> {
   let data = TernaryTreeList::from(&[0, 1, 2, 3, 4, 5, 6, 7, 8, 9]);
   assert_eq!(data.format_inline(), "((0 1 2) (3 (4 5) 6) (7 8 9))");

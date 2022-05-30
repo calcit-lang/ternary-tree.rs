@@ -231,4 +231,199 @@ where
       }
     }
   }
+  /// try to split a small bunch of elements under(or equal) a bound size,
+  /// meanwhile also maintain the right branches relatively shallow
+  /// if all token, the rest part returns None
+  /// `bound` is `1, 3, 9, 27, ...`
+  pub fn split_right_some(&self, bound: usize) -> (Option<Self>, Self) {
+    if self.len() <= bound {
+      return (None, self.to_owned());
+    }
+    match &self {
+      Leaf(_) => (None, self.to_owned()),
+      Branch2 {
+        size: root_size,
+        left,
+        middle,
+      } => {
+        if middle.len() <= bound {
+          let (rest_part, next_right_branch) = left.split_right_some(bound * 3);
+          match rest_part {
+            Some(branch) => (
+              Some(Branch2 {
+                size: root_size - middle.len(),
+                left: Arc::new(branch),
+                middle: Arc::new(next_right_branch),
+              }),
+              (**middle).to_owned(),
+            ),
+            None => (Some((**left).to_owned()), (**middle).to_owned()),
+          }
+        } else {
+          match &**middle {
+            Leaf(_) => unreachable!("leaf should already fall into prev case"),
+            Branch2 {
+              size: _child_size,
+              left: left_child,
+              middle: middle_child,
+            } => {
+              let (rest_node, small_bunch) = middle_child.split_right_some(bound);
+              match rest_node {
+                Some(branch) => (
+                  Some(Branch3 {
+                    size: root_size - small_bunch.len(),
+                    left: left.to_owned(),
+                    middle: left_child.to_owned(),
+                    right: Arc::new(branch),
+                  }),
+                  small_bunch,
+                ),
+                None => (
+                  Some(Branch2 {
+                    size: root_size - middle_child.len(),
+                    left: left.to_owned(),
+                    middle: left_child.to_owned(),
+                  }),
+                  (**middle_child).to_owned(),
+                ),
+              }
+            }
+            Branch3 {
+              size: child_size,
+              left: left_child,
+              middle: middle_child,
+              right: right_child,
+            } => {
+              let (rest_node, small_bunch) = right_child.split_right_some(bound);
+              match rest_node {
+                Some(branch) => (
+                  Some(Branch2 {
+                    size: root_size - small_bunch.len(),
+                    left: left.to_owned(),
+                    middle: Arc::new(Branch3 {
+                      size: child_size - small_bunch.len(),
+                      left: left_child.to_owned(),
+                      middle: middle_child.to_owned(),
+                      right: Arc::new(branch),
+                    }),
+                  }),
+                  small_bunch,
+                ),
+                None => (
+                  Some(Branch3 {
+                    size: root_size - small_bunch.len(),
+                    left: left.to_owned(),
+                    middle: left_child.to_owned(),
+                    right: middle_child.to_owned(),
+                  }),
+                  small_bunch,
+                ),
+              }
+            }
+          }
+        }
+      }
+      Branch3 {
+        size: root_size,
+        left,
+        middle,
+        right,
+      } => {
+        if right.len() <= bound {
+          let (rest_part, next_right_branch) = middle.split_right_some(bound * 3);
+          match rest_part {
+            Some(branch) => (
+              Some(Branch3 {
+                size: root_size - right.len(),
+                left: left.to_owned(),
+                middle: Arc::new(branch),
+                right: Arc::new(next_right_branch),
+              }),
+              (**right).to_owned(),
+            ),
+            None => (
+              Some(Branch2 {
+                size: root_size - right.len(),
+                left: left.to_owned(),
+                middle: middle.to_owned(),
+              }),
+              (**right).to_owned(),
+            ),
+          }
+        } else {
+          match &**right {
+            Leaf(_) => unreachable!("leaf should already fall into prev case"),
+            Branch2 {
+              size: child_size,
+              left: left_child,
+              middle: middle_child,
+            } => {
+              let (rest_node, small_bunch) = middle_child.split_right_some(bound);
+              match rest_node {
+                Some(branch) => (
+                  Some(Branch3 {
+                    size: root_size - small_bunch.len(),
+                    left: left.to_owned(),
+                    middle: middle.to_owned(),
+                    right: Arc::new(Branch2 {
+                      size: child_size - small_bunch.len(),
+                      left: left_child.to_owned(),
+                      middle: Arc::new(branch),
+                    }),
+                  }),
+                  small_bunch,
+                ),
+                None => (
+                  Some(Branch3 {
+                    size: root_size - middle_child.len(),
+                    left: left.to_owned(),
+                    middle: middle.to_owned(),
+                    right: left_child.to_owned(),
+                  }),
+                  (**middle_child).to_owned(),
+                ),
+              }
+            }
+            Branch3 {
+              size: child_size,
+              left: left_child,
+              middle: middle_child,
+              right: right_child,
+            } => {
+              let (rest_node, small_bunch) = right_child.split_right_some(bound);
+              match rest_node {
+                Some(branch) => (
+                  Some(Branch3 {
+                    size: root_size - small_bunch.len(),
+                    left: left.to_owned(),
+                    middle: middle.to_owned(),
+                    right: Arc::new(Branch3 {
+                      size: child_size - small_bunch.len(),
+                      left: left_child.to_owned(),
+                      middle: middle_child.to_owned(),
+                      right: Arc::new(branch),
+                    }),
+                  }),
+                  small_bunch,
+                ),
+                None => (
+                  Some(Branch3 {
+                    size: root_size - small_bunch.len(),
+                    left: left.to_owned(),
+                    middle: middle.to_owned(),
+                    right: Arc::new(Branch2 {
+                      size: child_size - small_bunch.len(),
+                      left: left_child.to_owned(),
+                      middle: middle_child.to_owned(),
+                    }),
+                  }),
+                  small_bunch,
+                ),
+              }
+            }
+          }
+        }
+      }
+    }
+  }
 }

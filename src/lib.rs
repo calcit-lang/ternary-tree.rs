@@ -245,6 +245,23 @@ where
     }
   }
 
+  /// optimized for armotized `O(1)` at best cases
+  pub fn drop_right(&self) -> Self {
+    match self {
+      Empty => TernaryTreeList::Empty,
+      Tree(t) => {
+        if t.len() == 1 {
+          TernaryTreeList::Empty
+        } else {
+          match t.split_right_some(1).0 {
+            Some(v) => TernaryTreeList::Tree(v),
+            None => unreachable!("got not body"),
+          }
+        }
+      }
+    }
+  }
+
   pub fn concat(raw: &[TernaryTreeList<T>]) -> Self {
     let mut trees: Vec<TernaryTree<T>> = vec![];
     for x in raw {
