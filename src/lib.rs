@@ -244,12 +244,11 @@ where
       Empty => TernaryTreeList::Empty,
       Tree(t) => {
         if t.len() == 1 {
-          TernaryTreeList::Empty
+          Self::Empty
         } else {
-          // TernaryTreeList::Tree(t.drop_left())
           match t.split_left_some(1).1 {
-            Some(v) => TernaryTreeList::Tree(v),
-            None => unreachable!("got not body"),
+            Some(v) => Self::Tree(v),
+            None => Self::Empty,
           }
         }
       }
@@ -259,14 +258,14 @@ where
   /// optimized for amortized `O(1)` at best cases
   pub fn drop_right(&self) -> Self {
     match self {
-      Empty => TernaryTreeList::Empty,
+      Empty => Self::Empty,
       Tree(t) => {
         if t.len() == 1 {
-          TernaryTreeList::Empty
+          Self::Empty
         } else {
           match t.split_right_some(1).0 {
-            Some(v) => TernaryTreeList::Tree(v),
-            None => unreachable!("got not body"),
+            Some(v) => Self::Tree(v),
+            None => Self::Empty,
           }
         }
       }
@@ -386,7 +385,7 @@ where
   fn next(&mut self) -> Option<Self::Item> {
     if self.index < self.value.len() {
       // println!("get: {} {}", self.value.format_inline(), self.index);
-      let ret = self.value.ref_get(self.index);
+      let ret = self.value.loop_get(self.index);
       self.index += 1;
       ret
     } else {
@@ -437,9 +436,13 @@ where
   type Output = T;
 
   fn index<'b>(&self, idx: usize) -> &Self::Output {
-    match self {
-      Empty => panic!("index out of bounds"),
-      Tree(t) => t.ref_get(idx),
+    if idx >= self.len() {
+      panic!("{} is out of bound at length {}", idx, self.len())
+    } else {
+      match self {
+        Empty => panic!("list is empty to index"),
+        Tree(t) => t.loop_get(idx),
+      }
     }
   }
 }
@@ -449,7 +452,6 @@ where
   T: Clone + Display + Eq + PartialEq + Debug + Ord + PartialOrd + Hash,
 {
   fn hash<H: Hasher>(&self, state: &mut H) {
-    "ternary".hash(state);
     match self {
       Empty => {}
       Tree(t) => t.hash(state),
