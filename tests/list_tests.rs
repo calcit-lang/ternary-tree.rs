@@ -49,7 +49,7 @@ fn list_operations() -> Result<(), String> {
 
   // get
   for (idx, v) in origin11.iter().enumerate() {
-    assert_eq!(*v, data11.loop_get(idx).unwrap());
+    assert_eq!(v, data11.loop_get(idx).unwrap());
   }
 
   assert_eq!(data11.first(), Some(&1));
@@ -59,8 +59,8 @@ fn list_operations() -> Result<(), String> {
   let origin5 = &[1, 2, 3, 4, 5];
   let data5 = TernaryTreeList::from(origin5);
   let updated = data5.assoc(3, 10)?;
-  assert_eq!(updated.loop_get(3).unwrap(), 10);
-  assert_eq!(data5.loop_get(3).unwrap(), 4);
+  assert_eq!(*updated.loop_get(3).unwrap(), 10);
+  assert_eq!(*data5.loop_get(3).unwrap(), 4);
   assert_eq!(updated.len(), data5.len());
 
   for idx in 0..data5.len() {
@@ -188,9 +188,9 @@ fn check_equality() -> Result<(), String> {
   let data4n = TernaryTreeList::from(&origin4);
   let data4_made = TernaryTreeList::from(&[2, 3, 4]).prepend(1);
 
-  assert!(data4.is_shape_same(&data4));
-  assert!(data4.is_shape_same(&data4n));
-  assert!(!data4.is_shape_same(&data4_made));
+  assert!(data4.eq_shape(&data4));
+  assert!(data4.eq_shape(&data4n));
+  assert!(!data4.eq_shape(&data4_made));
 
   assert!(data4 == data4n);
   assert!(data4 == data4_made);
