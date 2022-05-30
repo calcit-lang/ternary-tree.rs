@@ -139,6 +139,38 @@ fn criterion_benchmark(c: &mut Criterion) {
     })
   });
 
+  c.bench_function("drop-left-shallow", |b| {
+    let mut data = TernaryTreeList::Empty;
+
+    for idx in 0..1000 {
+      data = data.push(idx);
+    }
+
+    b.iter(move || {
+      let mut d = data.to_owned();
+
+      while d.len() > 1 {
+        d = d.drop_left_shallow()
+      }
+    })
+  });
+
+  c.bench_function("drop-right-shallow", |b| {
+    let mut data = TernaryTreeList::Empty;
+
+    for idx in 0..1000 {
+      data = data.push(idx);
+    }
+
+    b.iter(move || {
+      let mut d = data.to_owned();
+
+      while d.len() > 1 {
+        d = d.drop_right_shallow()
+      }
+    })
+  });
+
   c.bench_function("drop-left from push_right", |b| {
     let mut data = TernaryTreeList::Empty;
 

@@ -238,8 +238,21 @@ where
     }
   }
 
-  /// optimized for amortized `O(1)` at best cases
   pub fn drop_left(&self) -> Self {
+    match self {
+      Empty => TernaryTreeList::Empty,
+      Tree(t) => {
+        if t.len() == 1 {
+          Self::Empty
+        } else {
+          Self::Tree(t.drop_left())
+        }
+      }
+    }
+  }
+
+  /// optimized for amortized `O(1)` at best cases, but copies a lot
+  pub fn drop_left_shallow(&self) -> Self {
     match self {
       Empty => TernaryTreeList::Empty,
       Tree(t) => {
@@ -255,8 +268,21 @@ where
     }
   }
 
-  /// optimized for amortized `O(1)` at best cases
   pub fn drop_right(&self) -> Self {
+    match self {
+      Empty => Self::Empty,
+      Tree(t) => {
+        if t.len() == 1 {
+          Self::Empty
+        } else {
+          Self::Tree(t.drop_right())
+        }
+      }
+    }
+  }
+
+  /// optimized for amortized `O(1)` at best cases, but copies a lot
+  pub fn drop_right_shallow(&self) -> Self {
     match self {
       Empty => Self::Empty,
       Tree(t) => {

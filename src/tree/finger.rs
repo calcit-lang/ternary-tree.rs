@@ -630,4 +630,202 @@ where
       }
     }
   }
+
+  pub fn drop_left(&self) -> Self {
+    match self {
+      Leaf(_) => {
+        unreachable!("not expected empty node inside tree")
+      }
+      Branch2 { size, left, middle, .. } => {
+        if left.len() == 1 {
+          (**middle).to_owned()
+        } else {
+          let changed_branch = left.drop_left();
+          match changed_branch {
+            Branch2 {
+              left: b_left,
+              middle: b_middle,
+              ..
+            } => Branch3 {
+              size: size - 1,
+              left: b_left,
+              middle: b_middle,
+              right: middle.to_owned(),
+            },
+            Branch3 {
+              left: b_left,
+              middle: b_middle,
+              right: b_right,
+              ..
+            } => {
+              let internal_branch = Branch2 {
+                size: b_middle.len() + b_right.len(),
+                left: b_middle,
+                middle: b_right,
+              };
+              Branch3 {
+                size: size - 1,
+                left: b_left,
+                middle: Arc::new(internal_branch),
+                right: middle.to_owned(),
+              }
+            }
+            _ => Branch2 {
+              size: size - 1,
+              left: Arc::new(changed_branch),
+              middle: middle.to_owned(),
+            },
+          }
+        }
+      }
+      Branch3 {
+        size, left, middle, right, ..
+      } => {
+        if left.len() == 1 {
+          match &**middle {
+            Branch2 {
+              left: b_left,
+              middle: b_middle,
+              ..
+            } => Branch3 {
+              size: size - 1,
+              left: b_left.to_owned(),
+              middle: b_middle.to_owned(),
+              right: right.to_owned(),
+            },
+            Branch3 {
+              left: b_left,
+              middle: b_middle,
+              right: b_right,
+              ..
+            } => {
+              let internal_branch = Branch2 {
+                size: b_middle.len() + b_right.len(),
+                left: b_middle.to_owned(),
+                middle: b_right.to_owned(),
+              };
+              Branch3 {
+                size: size - 1,
+                left: b_left.to_owned(),
+                middle: Arc::new(internal_branch),
+                right: right.to_owned(),
+              }
+            }
+            _ => Branch2 {
+              size: size - 1,
+              left: middle.to_owned(),
+              middle: right.to_owned(),
+            },
+          }
+        } else {
+          let changed_branch = left.drop_left();
+          Branch3 {
+            size: size - 1,
+            left: Arc::new(changed_branch),
+            middle: middle.to_owned(),
+            right: right.to_owned(),
+          }
+        }
+      }
+    }
+  }
+
+  pub fn drop_right(&self) -> Self {
+    match self {
+      Leaf(_) => {
+        unreachable!("not expected empty node inside tree")
+      }
+      Branch2 { size, left, middle, .. } => {
+        if middle.len() == 1 {
+          (**left).to_owned()
+        } else {
+          let changed_branch = middle.drop_right();
+          match changed_branch {
+            Branch2 {
+              left: b_left,
+              middle: b_middle,
+              ..
+            } => Branch3 {
+              size: size - 1,
+              left: left.to_owned(),
+              middle: b_left,
+              right: b_middle,
+            },
+            Branch3 {
+              left: b_left,
+              middle: b_middle,
+              right: b_right,
+              ..
+            } => {
+              let internal_branch = Branch2 {
+                size: b_middle.len() + b_left.len(),
+                left: b_left,
+                middle: b_middle,
+              };
+              Branch3 {
+                size: size - 1,
+                left: left.to_owned(),
+                middle: Arc::new(internal_branch),
+                right: b_right,
+              }
+            }
+            _ => Branch2 {
+              size: size - 1,
+              left: left.to_owned(),
+              middle: Arc::new(changed_branch),
+            },
+          }
+        }
+      }
+      Branch3 {
+        size, right, middle, left, ..
+      } => {
+        if right.len() == 1 {
+          match &**middle {
+            Branch2 {
+              left: b_left,
+              middle: b_middle,
+              ..
+            } => Branch3 {
+              size: size - 1,
+              left: left.to_owned(),
+              middle: b_left.to_owned(),
+              right: b_middle.to_owned(),
+            },
+            Branch3 {
+              left: b_left,
+              middle: b_middle,
+              right: b_right,
+              ..
+            } => {
+              let internal_branch = Branch2 {
+                size: b_middle.len() + b_left.len(),
+                left: b_left.to_owned(),
+                middle: b_middle.to_owned(),
+              };
+              Branch3 {
+                size: size - 1,
+                left: left.to_owned(),
+                middle: Arc::new(internal_branch),
+                right: b_right.to_owned(),
+              }
+            }
+            _ => Branch2 {
+              size: size - 1,
+              left: left.to_owned(),
+              middle: middle.to_owned(),
+            },
+          }
+        } else {
+          let changed_branch = right.drop_right();
+          Branch3 {
+            size: size - 1,
+            left: left.to_owned(),
+            middle: middle.to_owned(),
+            right: Arc::new(changed_branch),
+          }
+        }
+      }
+    }
+  }
 }
