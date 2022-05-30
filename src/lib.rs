@@ -246,7 +246,11 @@ where
         if t.len() == 1 {
           TernaryTreeList::Empty
         } else {
-          TernaryTreeList::Tree(t.drop_left())
+          // TernaryTreeList::Tree(t.drop_left())
+          match t.split_left_some(1).1 {
+            Some(v) => TernaryTreeList::Tree(v),
+            None => unreachable!("got not body"),
+          }
         }
       }
     }
