@@ -23,12 +23,42 @@ fn criterion_benchmark(c: &mut Criterion) {
     })
   });
 
+  c.bench_function("append to list", |b| {
+    b.iter(|| {
+      let mut data = TernaryTreeList::Empty;
+
+      for idx in 0..1000 {
+        data = data.append(idx)
+      }
+    })
+  });
+
   c.bench_function("push_right list", |b| {
     b.iter(|| {
       let mut data = TernaryTreeList::Empty;
 
       for idx in 0..1000 {
         data = data.push_right(idx)
+      }
+    })
+  });
+
+  c.bench_function("unshift to list", |b| {
+    b.iter(|| {
+      let mut data = TernaryTreeList::Empty;
+
+      for idx in 0..1000 {
+        data = data.unshift(idx)
+      }
+    })
+  });
+
+  c.bench_function("push_left list", |b| {
+    b.iter(|| {
+      let mut data = TernaryTreeList::Empty;
+
+      for idx in 0..1000 {
+        data = data.push_left(idx)
       }
     })
   });

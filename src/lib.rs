@@ -223,15 +223,22 @@ where
       Tree(t) => TernaryTreeList::Tree(t.append(item)),
     }
   }
-  /// optimized for armotized `O(1)` performance at best cases
+  /// optimized for amortized `O(1)` performance at best cases
   pub fn push_right(&self, item: T) -> Self {
     match self {
       Empty => TernaryTreeList::Tree(TernaryTree::Leaf(Arc::new(item))),
       Tree(t) => TernaryTreeList::Tree(t.push_right(item)),
     }
   }
+  /// optimized for amortized `O(1)` performance at best cases
+  pub fn push_left(&self, item: T) -> Self {
+    match self {
+      Empty => TernaryTreeList::Tree(TernaryTree::Leaf(Arc::new(item))),
+      Tree(t) => TernaryTreeList::Tree(t.push_left(item)),
+    }
+  }
 
-  /// optimized for armotized `O(1)` at best cases
+  /// optimized for amortized `O(1)` at best cases
   pub fn drop_left(&self) -> Self {
     match self {
       Empty => TernaryTreeList::Empty,
@@ -245,7 +252,7 @@ where
     }
   }
 
-  /// optimized for armotized `O(1)` at best cases
+  /// optimized for amortized `O(1)` at best cases
   pub fn drop_right(&self) -> Self {
     match self {
       Empty => TernaryTreeList::Empty,

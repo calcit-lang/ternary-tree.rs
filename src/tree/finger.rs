@@ -80,6 +80,63 @@ where
     }
   }
 
+  // for main branches detect keep a finger-tree like shallow-deep-shallow shape
+  fn push_left_main(&self, item: Self, n: u8) -> Self {
+    // println!("  iter: {} {:?}", self.format_inline(), mark);
+
+    if self.len() + item.len() <= triple_size(n) {
+      self.push_left_side(item)
+    } else {
+      match self {
+        Leaf(_) => self.push_left_side(item),
+        Branch2 { size, left, middle, .. } => {
+          if left.len() + item.len() > triple_size(n) {
+            Branch3 {
+              size: size + item.len(),
+              left: Arc::new(item),
+              middle: left.to_owned(),
+              right: middle.to_owned(),
+            }
+          } else {
+            // pile items in the compact way like in sides
+            // println!("    try n: {}", n);
+            let item_size = item.len();
+            let changed_branch = left.push_left_side(item);
+
+            Branch2 {
+              size: size + item_size,
+              left: Arc::new(changed_branch),
+              middle: middle.to_owned(),
+            }
+          }
+        }
+        Branch3 {
+          size, right, middle, left, ..
+        } => {
+          // println!("    b3 n: {}", n);
+          if left.len() + item.len() > triple_size(n - 1) {
+            let changed_branch = middle.push_left_main((**left).to_owned(), n + 1);
+            Branch3 {
+              size: right.len() + changed_branch.len() + item.len(),
+              left: Arc::new(item),
+              middle: Arc::new(changed_branch),
+              right: right.to_owned(),
+            }
+          } else {
+            let item_size = item.len();
+            let changed_branch = left.push_left_side(item);
+            Branch3 {
+              size: size + item_size,
+              left: Arc::new(changed_branch),
+              middle: middle.to_owned(),
+              right: right.to_owned(),
+            }
+          }
+        }
+      }
+    }
+  }
+
   // just pile items in the compact way
   fn push_right_side(&self, item: Self) -> Self {
     // println!("  iter: {} {:?}", self.format_inline(), mark);
@@ -128,9 +185,62 @@ where
     }
   }
 
+  // just pile items in the compact way
+  fn push_left_side(&self, item: Self) -> Self {
+    // println!("  iter: {} {:?}", self.format_inline(), mark);
+    match self {
+      Leaf(a) => Branch2 {
+        size: 1 + item.len(),
+        left: Arc::new(item),
+        middle: Arc::new(Leaf(a.to_owned())),
+      },
+      Branch2 { size, left, middle, .. } => {
+        if left.len() + item.len() > middle.len() {
+          Branch3 {
+            size: size + item.len(),
+            left: Arc::new(item),
+            middle: left.to_owned(),
+            right: middle.to_owned(),
+          }
+        } else {
+          let changed_branch = left.push_left_side(item.to_owned());
+          Branch2 {
+            size: size + item.len(),
+            left: Arc::new(changed_branch),
+            middle: middle.to_owned(),
+          }
+        }
+      }
+      Branch3 {
+        size, right, middle, left, ..
+      } => {
+        if left.len() + item.len() > middle.len() {
+          Branch2 {
+            size: size + item.len(),
+            left: Arc::new(item),
+            middle: Arc::new(self.to_owned()),
+          }
+        } else {
+          let changed_branch = left.push_left_side(item.to_owned());
+          Branch3 {
+            size: size + item.len(),
+            left: Arc::new(changed_branch),
+            middle: middle.to_owned(),
+            right: right.to_owned(),
+          }
+        }
+      }
+    }
+  }
+
   pub fn push_right(&self, item: T) -> Self {
     // start with 2 so its left child branch has capability of only 3^1
     self.push_right_main(Leaf(Arc::new(item)), 2)
+  }
+
+  pub fn push_left(&self, item: T) -> Self {
+    // start with 2 so its left child branch has capability of only 3^1
+    self.push_left_main(Leaf(Arc::new(item)), 2)
   }
 
   pub fn drop_left(&self) -> Self {
