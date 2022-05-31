@@ -63,11 +63,14 @@ where
   }
 
   /// get element in list by reference
+  /// PERF: recursive function is slower than iterative loop with Cell in bench(using `usize`),
+  /// however, Calcit is heavy in cloning(reference though... according real practice),
+  /// so here we still choose `ref_get` for speed in Calcit project.
   pub fn get(&self, idx: usize) -> Option<&T> {
     if self.is_empty() || idx >= self.len() {
       None
     } else {
-      self.loop_get(idx)
+      self.ref_get(idx)
     }
   }
 
@@ -411,7 +414,7 @@ where
   fn next(&mut self) -> Option<Self::Item> {
     if self.index < self.value.len() {
       // println!("get: {} {}", self.value.format_inline(), self.index);
-      let ret = self.value.loop_get(self.index);
+      let ret = self.value.ref_get(self.index);
       self.index += 1;
       ret
     } else {
@@ -467,7 +470,7 @@ where
     } else {
       match self {
         Empty => panic!("list is empty to index"),
-        Tree(t) => t.loop_get(idx),
+        Tree(t) => t.ref_get(idx),
       }
     }
   }
