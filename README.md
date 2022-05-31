@@ -1,6 +1,8 @@
-## Structrual sharing tree for Calcit
+## Persistetnt structrual sharing tree for Calcit
 
-> borrowed ideas from 2-3 tree and finger-tree.
+> a variant of 2-3 tree, with enhancements on ternary branching, optimized with tricks like finger-tree.
+
+`t.pop_left()` and `t.push_right(..)` is optimized to be amortized `O(1)` at best cases and `O(log n)` when restructuring involed.
 
 Tree layout from 0 to 159 watch [video](https://www.bilibili.com/video/BV1F34y147V7) or try [live demo](https://github.com/calcit-lang/explain-ternary-tree).
 

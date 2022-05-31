@@ -1,3 +1,9 @@
+//! internal implementation of this tree.
+//! this file should be optimized for speed, even to skip some checks repeatedly down the tree,
+//! checks can be added at the struct that wraps this tree
+
+mod finger;
+
 use std::cell::RefCell;
 use std::cmp::Ordering;
 use std::fmt;
@@ -6,9 +12,9 @@ use std::hash::{Hash, Hasher};
 use std::ops::Index;
 use std::sync::Arc;
 
-use crate::util::divide_ternary_sizes;
+use crate::util::{divide_ternary_sizes, triple_size};
 
-/// internal tree structure without empty nodes
+/// internal tree structure, it can't be empty
 #[derive(Clone, Debug)]
 pub enum TernaryTree<T> {
   Leaf(Arc<T>),
@@ -117,7 +123,7 @@ where
     }
   }
 
-  /// turn into a compare representation, with `_` for holes
+  /// turn into a representation in triples, with `_` for holes
   pub fn format_inline(&self) -> String {
     match self {
       Leaf(value) => value.to_string(),
@@ -129,14 +135,6 @@ where
         // TODO maybe need more informations here
         format!("({} {} {})", left.format_inline(), middle.format_inline(), right.format_inline())
       }
-    }
-  }
-
-  pub fn get(&self, idx: usize) -> Option<&T> {
-    if idx >= self.len() {
-      None
-    } else {
-      self.ref_get(idx)
     }
   }
 
@@ -183,7 +181,7 @@ where
   }
 
   /// recursively check structure
-  pub fn is_shape_same(&self, ys: &Self) -> bool {
+  pub fn eq_shape(&self, ys: &Self) -> bool {
     if self.len() != ys.len() {
       return false;
     }
@@ -197,7 +195,7 @@ where
           middle: middle2,
           ..
         },
-      ) => left.is_shape_same(left2) && middle.is_shape_same(middle2),
+      ) => left.eq_shape(left2) && middle.eq_shape(middle2),
       (
         Branch3 { left, middle, right, .. },
         Branch3 {
@@ -206,7 +204,7 @@ where
           right: right2,
           ..
         },
-      ) => left.is_shape_same(left2) && middle.is_shape_same(middle2) && right.is_shape_same(right2),
+      ) => left.eq_shape(left2) && middle.eq_shape(middle2) && right.eq_shape(right2),
 
       (_, _) => false,
     }
@@ -221,7 +219,8 @@ where
     acc
   }
 
-  pub fn ref_get(&self, idx: usize) -> Option<&T> {
+  /// get with reference, but index is not checked, returns last element if too large
+  pub fn ref_get(&self, idx: usize) -> &T {
     // println!("get: {} {}", self.format_inline(), idx);
     // if idx >= self.len() {
     //   println!("get from out of bound: {} {}", idx, self.len());
@@ -231,11 +230,13 @@ where
       Branch3 { left, middle, right, .. } => {
         let base = left.len();
         if idx < base {
-          left.ref_get(idx)
-        } else if idx < base + middle.len() {
-          middle.ref_get(idx - base)
+          return left.ref_get(idx);
+        }
+        let idx_in_middle = idx - base;
+        if idx_in_middle < middle.len() {
+          middle.ref_get(idx_in_middle)
         } else {
-          right.ref_get(idx - base - middle.len())
+          right.ref_get(idx_in_middle - middle.len())
         }
       }
       Branch2 { left, middle, .. } => {
@@ -246,62 +247,43 @@ where
           middle.ref_get(idx - base)
         }
       }
-      Leaf(value) => Some(value),
+      Leaf(value) => value,
     }
   }
 
-  /// get via go down the branch with a mutable loop
-  pub fn loop_get(&self, original_idx: usize) -> Option<T> {
-    let mut tree_parent = self.to_owned();
+  /// get am element via drilling down the branch with a mutable loop,
+  /// supposed to be faster than `ref_get` since it's more like VM instructions
+  pub fn loop_get(&'a self, original_idx: usize) -> &'a T {
+    let r = RefCell::new(self);
+    let mut tree_parent = r.borrow_mut();
     let mut idx = original_idx;
     loop {
-      match tree_parent {
+      match *tree_parent {
         Leaf(value) => {
-          if idx == 0 {
-            return Some((*value).to_owned());
-          } else {
-            println!("[warning] Cannot get from leaf with index {}", idx);
-            return None;
-          }
+          return value;
         }
-        Branch2 { left, middle, size, .. } => {
-          if idx > size - 1 {
-            println!("[warning] Index too large at {} from {}", idx, size);
-            return None;
-          }
-
-          if left.len() + middle.len() != size {
-            unreachable!("tree.size does not match sum case branch sizes");
-          }
-
+        Branch2 { left, middle, .. } => {
           if idx < left.len() {
-            tree_parent = (*left).to_owned();
+            *tree_parent = left;
           } else {
-            tree_parent = (*middle).to_owned();
+            *tree_parent = middle;
             idx -= left.len();
           }
         }
-        Branch3 {
-          left, middle, right, size, ..
-        } => {
-          if idx > size - 1 {
-            println!("[warning] Index too large at {} from {}", idx, size);
-            return None;
-          }
-
-          if left.len() + middle.len() + right.len() != size {
-            unreachable!("tree.size does not match sum case branch sizes");
-          }
-
+        Branch3 { left, middle, right, .. } => {
           if idx < left.len() {
-            tree_parent = (*left).to_owned();
-          } else if idx < left.len() + middle.len() {
-            tree_parent = (*middle).to_owned();
-            idx -= left.len();
-          } else {
-            tree_parent = (*right).to_owned();
-            idx -= left.len() + middle.len();
+            *tree_parent = left;
+            continue;
           }
+          idx -= left.len();
+
+          if idx < middle.len() {
+            *tree_parent = middle;
+            continue;
+          }
+
+          *tree_parent = right;
+          idx -= middle.len();
         }
       }
     }
@@ -322,11 +304,9 @@ where
       Branch3 { right, .. } => right.last(),
     }
   }
-  pub fn assoc(&self, idx: usize, item: T) -> Result<Self, String> {
-    if idx > self.len() - 1 {
-      return Err(format!("Index too large {} for {}", idx, self.format_inline()));
-    }
 
+  // insert new element at position, does not check whether the index is out of bound
+  pub fn assoc(&self, idx: usize, item: T) -> Result<Self, String> {
     match self {
       Leaf { .. } => {
         if idx == 0 {
@@ -336,14 +316,6 @@ where
         }
       }
       Branch2 { left, middle, size, .. } => {
-        if left.len() + middle.len() != *size {
-          return Err(format!(
-            "tree size {} does not match sum case branch sizes, {}",
-            size,
-            self.format_inline()
-          ));
-        }
-
         if idx < left.len() {
           let changed_branch = left.assoc(idx, item)?;
           Ok(Branch2 {
@@ -363,14 +335,6 @@ where
       Branch3 {
         left, middle, right, size, ..
       } => {
-        if left.len() + middle.len() + right.len() != *size {
-          return Err(format!(
-            "tree size {} does not match sum case branch sizes, {}",
-            size,
-            self.format_inline()
-          ));
-        }
-
         if idx < left.len() {
           let changed_branch = left.assoc(idx, item)?;
           Ok(Branch3 {
@@ -399,25 +363,12 @@ where
       }
     }
   }
-  pub fn dissoc(&self, idx: usize) -> Result<Self, String> {
-    if idx > self.len() - 1 {
-      return Err(format!("Index too large {} for {}", idx, self.len()));
-    } else if self.len() == 1 {
-      // idx already == 0
-      return Err(String::from("Cannot remove from singleton list to empty"));
-    }
 
+  // remove element from give position, does not check whether the index is out of bound
+  pub fn dissoc(&self, idx: usize) -> Result<Self, String> {
     match self {
       Leaf { .. } => unreachable!("dissoc should be handled at branches"),
       Branch2 { left, middle, size, .. } => {
-        if left.len() + middle.len() != *size {
-          return Err(format!(
-            "tree {} does not match sum from branch sizes {}",
-            self.format_inline(),
-            self.len()
-          ));
-        }
-
         if idx < left.len() {
           if left.len() == 1 {
             Ok((**middle).to_owned())
@@ -794,215 +745,6 @@ where
     }
   }
 
-  // for main branches detect keep a finger-tree like shallow-deep-shallow shape
-  fn push_right_main(&self, item: Self, n: u8) -> Self {
-    // println!("  iter: {} {:?}", self.format_inline(), mark);
-
-    if self.len() + item.len() <= triple_size(n) {
-      self.push_right_side(item)
-    } else {
-      match self {
-        Leaf(_) => self.push_right_side(item),
-        Branch2 { size, left, middle, .. } => {
-          if middle.len() + item.len() > triple_size(n) {
-            Branch3 {
-              size: size + item.len(),
-              left: left.to_owned(),
-              middle: middle.to_owned(),
-              right: Arc::new(item),
-            }
-          } else {
-            // pile items in the compact way like in sides
-            // println!("    try n: {}", n);
-            let item_size = item.len();
-            let changed_branch = middle.push_right_side(item);
-
-            Branch2 {
-              size: size + item_size,
-              left: left.to_owned(),
-              middle: Arc::new(changed_branch),
-            }
-          }
-        }
-        Branch3 {
-          size, left, middle, right, ..
-        } => {
-          // println!("    b3 n: {}", n);
-          if right.len() + item.len() > triple_size(n - 1) {
-            let changed_branch = middle.push_right_main((**right).to_owned(), n + 1);
-            Branch3 {
-              size: left.len() + changed_branch.len() + item.len(),
-              left: left.to_owned(),
-              middle: Arc::new(changed_branch),
-              right: Arc::new(item),
-            }
-          } else {
-            let item_size = item.len();
-            let changed_branch = right.push_right_side(item);
-            Branch3 {
-              size: size + item_size,
-              left: left.to_owned(),
-              middle: middle.to_owned(),
-              right: Arc::new(changed_branch),
-            }
-          }
-        }
-      }
-    }
-  }
-
-  // just pile items in the compact way
-  fn push_right_side(&self, item: Self) -> Self {
-    // println!("  iter: {} {:?}", self.format_inline(), mark);
-    match self {
-      Leaf(a) => Branch2 {
-        size: 1 + item.len(),
-        left: Arc::new(Leaf(a.to_owned())),
-        middle: Arc::new(item),
-      },
-      Branch2 { size, left, middle, .. } => {
-        if middle.len() + item.len() > left.len() {
-          Branch3 {
-            size: size + item.len(),
-            left: left.to_owned(),
-            middle: middle.to_owned(),
-            right: Arc::new(item),
-          }
-        } else {
-          let changed_branch = middle.push_right_side(item.to_owned());
-          Branch2 {
-            size: size + item.len(),
-            left: left.to_owned(),
-            middle: Arc::new(changed_branch),
-          }
-        }
-      }
-      Branch3 {
-        size, left, middle, right, ..
-      } => {
-        if right.len() + item.len() > middle.len() {
-          Branch2 {
-            size: size + item.len(),
-            left: Arc::new(self.to_owned()),
-            middle: Arc::new(item),
-          }
-        } else {
-          let changed_branch = right.push_right_side(item.to_owned());
-          Branch3 {
-            size: size + item.len(),
-            left: left.to_owned(),
-            middle: middle.to_owned(),
-            right: Arc::new(changed_branch),
-          }
-        }
-      }
-    }
-  }
-
-  pub fn push_right(&self, item: T) -> Self {
-    // start with 2 so its left child branch has capability of only 3^1
-    self.push_right_main(Leaf(Arc::new(item)), 2)
-  }
-
-  pub fn drop_left(&self) -> Self {
-    match self {
-      Leaf(_) => {
-        unreachable!("not expected empty node inside tree")
-      }
-      Branch2 { size, left, middle, .. } => {
-        if left.len() == 1 {
-          (**middle).to_owned()
-        } else {
-          let changed_branch = left.drop_left();
-          match changed_branch {
-            Branch2 {
-              left: b_left,
-              middle: b_middle,
-              ..
-            } => Branch3 {
-              size: size - 1,
-              left: b_left,
-              middle: b_middle,
-              right: middle.to_owned(),
-            },
-            Branch3 {
-              left: b_left,
-              middle: b_middle,
-              right: b_right,
-              ..
-            } => {
-              let internal_branch = Branch2 {
-                size: b_middle.len() + b_right.len(),
-                left: b_middle,
-                middle: b_right,
-              };
-              Branch3 {
-                size: size - 1,
-                left: b_left,
-                middle: Arc::new(internal_branch),
-                right: middle.to_owned(),
-              }
-            }
-            _ => Branch2 {
-              size: size - 1,
-              left: Arc::new(changed_branch),
-              middle: middle.to_owned(),
-            },
-          }
-        }
-      }
-      Branch3 {
-        size, left, middle, right, ..
-      } => {
-        if left.len() == 1 {
-          match &**middle {
-            Branch2 {
-              left: b_left,
-              middle: b_middle,
-              ..
-            } => Branch3 {
-              size: size - 1,
-              left: b_left.to_owned(),
-              middle: b_middle.to_owned(),
-              right: right.to_owned(),
-            },
-            Branch3 {
-              left: b_left,
-              middle: b_middle,
-              right: b_right,
-              ..
-            } => {
-              let internal_branch = Branch2 {
-                size: b_middle.len() + b_right.len(),
-                left: b_middle.to_owned(),
-                middle: b_right.to_owned(),
-              };
-              Branch3 {
-                size: size - 1,
-                left: b_left.to_owned(),
-                middle: Arc::new(internal_branch),
-                right: right.to_owned(),
-              }
-            }
-            _ => Branch2 {
-              size: size - 1,
-              left: middle.to_owned(),
-              middle: right.to_owned(),
-            },
-          }
-        } else {
-          let changed_branch = left.drop_left();
-          Branch3 {
-            size: size - 1,
-            left: Arc::new(changed_branch),
-            middle: middle.to_owned(),
-            right: right.to_owned(),
-          }
-        }
-      }
-    }
-  }
-
   pub fn concat(raw: &[TernaryTree<T>]) -> Self {
     let mut xs_groups: Vec<TernaryTree<T>> = Vec::with_capacity(raw.len());
     for x in raw {
@@ -1066,18 +808,11 @@ where
       }
     }
   }
-  // excludes value at end_idx, kept aligned with JS & Clojure
+
+  /// excludes value at end_idx, kept aligned with JS & Clojure
+  /// does not check at inside
   pub fn slice(&self, start_idx: usize, end_idx: usize) -> Result<Self, String> {
     // echo "slice {tree.formatListInline}: {start_idx}..{end_idx}"
-    if end_idx > self.len() {
-      return Err(format!("Slice range too large {} for {}", end_idx, self.format_inline()));
-    }
-    if start_idx > end_idx {
-      return Err(format!("Invalid slice range {}..{} for {}", start_idx, end_idx, self));
-    }
-    if start_idx == end_idx {
-      return Err(format!("Slice range empty {}..{} for {}", start_idx, end_idx, self));
-    }
 
     match self {
       Leaf { .. } => {
@@ -1194,13 +929,10 @@ where
   }
 
   pub fn to_vec(&self) -> Vec<T> {
-    let mut xs = vec![];
-
-    // TODO
+    let mut xs = Vec::with_capacity(self.len());
     for item in self {
       xs.push(item.to_owned());
     }
-
     xs
   }
 
@@ -1244,9 +976,9 @@ where
   fn next(&mut self) -> Option<Self::Item> {
     if self.index < self.value.len() {
       // println!("get: {} {}", self.value.format_inline(), self.index);
-      let ret = self.value.ref_get(self.index);
+      let ret = self.value.loop_get(self.index);
       self.index += 1;
-      ret
+      Some(ret)
     } else {
       None
     }
@@ -1260,7 +992,7 @@ impl<T: Clone + Display + Eq + PartialEq + Debug + Ord + PartialOrd + Hash> Part
     }
 
     for idx in 0..ys.len() {
-      if self.ref_get(idx) != ys.ref_get(idx) {
+      if self.loop_get(idx) != ys.loop_get(idx) {
         return false;
       }
     }
@@ -1287,7 +1019,7 @@ where
   fn cmp(&self, other: &Self) -> Ordering {
     if self.len() == other.len() {
       for idx in 0..self.len() {
-        match self.ref_get(idx).cmp(&other.ref_get(idx)) {
+        match self.loop_get(idx).cmp(other.loop_get(idx)) {
           Ordering::Equal => {}
           a => return a,
         }
@@ -1308,7 +1040,7 @@ where
 
   fn index<'b>(&self, idx: usize) -> &Self::Output {
     // println!("get: {} {}", self.format_inline(), idx);
-    self.ref_get(idx).expect("get from list")
+    self.loop_get(idx)
   }
 }
 
@@ -1317,19 +1049,15 @@ where
   T: Clone + Display + Eq + PartialEq + Debug + Ord + PartialOrd + Hash,
 {
   fn hash<H: Hasher>(&self, state: &mut H) {
-    "ternary".hash(state);
     match self {
       Leaf(value) => {
-        "leaf".hash(state);
         value.hash(state);
       }
       Branch2 { left, middle, .. } => {
-        "branch".hash(state);
         left.hash(state);
         middle.hash(state);
       }
       Branch3 { left, middle, right, .. } => {
-        "branch".hash(state);
         left.hash(state);
         middle.hash(state);
         right.hash(state);
@@ -1360,9 +1088,4 @@ where
       write_leaves(right, acc, counter);
     }
   }
-}
-
-fn triple_size(t: u8) -> usize {
-  let n: usize = 3;
-  n.pow(t as u32)
 }

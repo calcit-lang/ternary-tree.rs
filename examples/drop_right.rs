@@ -9,7 +9,7 @@ pub fn main() -> Result<(), String> {
   }
 
   for _ in 0..59 {
-    tree = tree.drop_left();
+    tree = tree.drop_right();
     println!("{}", tree.format_inline());
   }
 
@@ -20,7 +20,7 @@ pub fn main() -> Result<(), String> {
   let mut data4 = TernaryTreeList::from(&origin4);
 
   for _ in 0..59 {
-    data4 = data4.drop_left();
+    data4 = data4.drop_right();
     println!("{}", data4.format_inline());
   }
 
@@ -33,7 +33,7 @@ pub fn main() -> Result<(), String> {
   // let mut d = data;
 
   // while d.len() > 1 {
-  //   d = d.drop_left();
+  //   d = d.drop_right();
   //   println!("{}", d.format_inline());
   // }
 

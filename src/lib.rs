@@ -1,6 +1,9 @@
-//! ternary tree with structural sharing.
-//! a bit like 2-3 finger tree, however this library does not handle balancing well.
-//! meanwhile, it is also an interesting library displaying with triples:
+//! A variant of 2-3 tree, with enhancements on ternary branching, optimized with tricks like finger-tree.
+//! `t.push_right(..)` is optimized to be amortized `O(1)` at best cases and `O(log n)` when restructuring involed.
+//!
+//! ![](https://pbs.twimg.com/media/FRc3gB7aQAA1pBb?format=jpg&name=4096x4096)
+//!
+//! it is also interesting to display it with triples:
 //!
 //! ```text
 //! (((0 1 2) (3 4 5) (6 7 8)) ((9 10 11) (12 13 14) (15 16 17)) (18 19 _))
@@ -22,10 +25,9 @@ use std::hash::{Hash, Hasher};
 use std::ops::Index;
 use std::sync::Arc;
 
-pub use tree::TernaryTree;
+use tree::TernaryTree::{self, *};
 
-use crate::tree::TernaryTree::*;
-
+/// wraps TerarnaryTreeList with support for empty
 #[derive(Clone, Debug)]
 pub enum TernaryTreeList<T> {
   Empty,
@@ -52,7 +54,7 @@ where
     }
   }
 
-  /// turn into a compare representation, with `_` for holes
+  /// turn into a representation in triples, `_` for holes
   pub fn format_inline(&self) -> String {
     match self {
       Empty => String::from("_"),
@@ -60,14 +62,16 @@ where
     }
   }
 
+  /// get element in list by reference
   pub fn get(&self, idx: usize) -> Option<&T> {
     if self.is_empty() || idx >= self.len() {
       None
     } else {
-      self.ref_get(idx)
+      self.loop_get(idx)
     }
   }
 
+  /// find position of matched element in list(if exists)
   pub fn find_index(&self, f: Arc<dyn Fn(&T) -> bool>) -> Option<i64> {
     match self {
       Empty => None,
@@ -75,6 +79,7 @@ where
     }
   }
 
+  /// find position of element
   pub fn index_of(&self, item: &T) -> Option<usize> {
     match self {
       Empty => None,
@@ -83,27 +88,29 @@ where
   }
 
   /// recursively check structure
-  pub fn is_shape_same(&self, ys: &Self) -> bool {
+  pub fn eq_shape(&self, ys: &Self) -> bool {
     match (self, ys) {
       (Empty, Empty) => true,
       (Empty, _) => false,
       (_, Empty) => false,
-      (Tree(x), Tree(y)) => x.is_shape_same(y),
+      (Tree(x), Tree(y)) => x.eq_shape(y),
     }
   }
 
+  /// unchecked get reference of element
   pub fn ref_get(&self, idx: usize) -> Option<&T> {
     match self {
       Empty => None,
-      Tree(t) => t.ref_get(idx),
+      Tree(t) => Some(t.ref_get(idx)),
     }
   }
 
-  /// get via go down the branch with a mutable loop
-  pub fn loop_get(&self, original_idx: usize) -> Option<T> {
+  /// unchecked get via go down the branch with a mutable loop
+  /// this function is SLOWER compared to `ref_get`, not used by default
+  pub fn loop_get(&self, original_idx: usize) -> Option<&T> {
     match self {
       Empty => None,
-      Tree(t) => t.loop_get(original_idx),
+      Tree(t) => Some(t.loop_get(original_idx)),
     }
   }
 
@@ -123,21 +130,34 @@ where
   pub fn assoc(&self, idx: usize, item: T) -> Result<Self, String> {
     match self {
       Empty => Err(String::from("empty")),
-      Tree(t) => Ok(TernaryTreeList::Tree(t.assoc(idx, item)?)),
+      Tree(t) => {
+        if idx > self.len() - 1 {
+          return Err(format!("Index too large {} for {}", idx, self.format_inline()));
+        } else {
+          Ok(TernaryTreeList::Tree(t.assoc(idx, item)?))
+        }
+      }
     }
   }
   pub fn dissoc(&self, idx: usize) -> Result<Self, String> {
     match self {
       Empty => Err(String::from("calling dissoc from empty")),
       Tree(t) => {
-        if idx == 0 && t.len() == 1 {
-          Ok(TernaryTreeList::Empty)
-        } else {
+        if t.len() == 1 {
+          if idx == 0 {
+            Ok(Empty)
+          } else {
+            Err(format!("Index too large {} for {}", idx, self.format_inline()))
+          }
+        } else if idx < t.len() {
           Ok(TernaryTreeList::Tree(t.dissoc(idx)?))
+        } else {
+          Err(format!("Index too large {} for {}", idx, self.format_inline()))
         }
       }
     }
   }
+  /// ternary tree operation of rest
   pub fn rest(&self) -> Result<Self, String> {
     if self.is_empty() {
       Err(String::from("calling rest on empty"))
@@ -196,16 +216,25 @@ where
   pub fn push(&self, item: T) -> Self {
     self.append(item)
   }
+  /// insert_after last element, this not optimzed for performance
   pub fn append(&self, item: T) -> Self {
     match self {
       Empty => TernaryTreeList::Tree(TernaryTree::Leaf(Arc::new(item))),
       Tree(t) => TernaryTreeList::Tree(t.append(item)),
     }
   }
+  /// optimized for amortized `O(1)` performance at best cases
   pub fn push_right(&self, item: T) -> Self {
     match self {
       Empty => TernaryTreeList::Tree(TernaryTree::Leaf(Arc::new(item))),
       Tree(t) => TernaryTreeList::Tree(t.push_right(item)),
+    }
+  }
+  /// optimized for amortized `O(1)` performance at best cases
+  pub fn push_left(&self, item: T) -> Self {
+    match self {
+      Empty => TernaryTreeList::Tree(TernaryTree::Leaf(Arc::new(item))),
+      Tree(t) => TernaryTreeList::Tree(t.push_left(item)),
     }
   }
 
@@ -214,9 +243,56 @@ where
       Empty => TernaryTreeList::Empty,
       Tree(t) => {
         if t.len() == 1 {
-          TernaryTreeList::Empty
+          Self::Empty
         } else {
-          TernaryTreeList::Tree(t.drop_left())
+          Self::Tree(t.drop_left())
+        }
+      }
+    }
+  }
+
+  /// optimized for amortized `O(1)` at best cases, but copies a lot
+  pub fn drop_left_shallow(&self) -> Self {
+    match self {
+      Empty => TernaryTreeList::Empty,
+      Tree(t) => {
+        if t.len() == 1 {
+          Self::Empty
+        } else {
+          match t.split_left_some(1).1 {
+            Some(v) => Self::Tree(v),
+            None => Self::Empty,
+          }
+        }
+      }
+    }
+  }
+
+  pub fn drop_right(&self) -> Self {
+    match self {
+      Empty => Self::Empty,
+      Tree(t) => {
+        if t.len() == 1 {
+          Self::Empty
+        } else {
+          Self::Tree(t.drop_right())
+        }
+      }
+    }
+  }
+
+  /// optimized for amortized `O(1)` at best cases, but copies a lot
+  pub fn drop_right_shallow(&self) -> Self {
+    match self {
+      Empty => Self::Empty,
+      Tree(t) => {
+        if t.len() == 1 {
+          Self::Empty
+        } else {
+          match t.split_right_some(1).0 {
+            Some(v) => Self::Tree(v),
+            None => Self::Empty,
+          }
         }
       }
     }
@@ -249,7 +325,19 @@ where
     }
     match self {
       Empty => Err(String::from("empty")),
-      Tree(t) => Ok(TernaryTreeList::Tree(t.slice(start_idx, end_idx)?)),
+      Tree(t) => {
+        // echo "slice {tree.formatListInline}: {start_idx}..{end_idx}"
+        if end_idx > self.len() {
+          return Err(format!("Slice range too large {} for {}", end_idx, self.format_inline()));
+        }
+        if start_idx > end_idx {
+          return Err(format!("Invalid slice range {}..{} for {}", start_idx, end_idx, self));
+        }
+        if start_idx == end_idx {
+          return Ok(TernaryTreeList::Empty);
+        }
+        Ok(TernaryTreeList::Tree(t.slice(start_idx, end_idx)?))
+      }
     }
   }
 
@@ -323,7 +411,7 @@ where
   fn next(&mut self) -> Option<Self::Item> {
     if self.index < self.value.len() {
       // println!("get: {} {}", self.value.format_inline(), self.index);
-      let ret = self.value.ref_get(self.index);
+      let ret = self.value.loop_get(self.index);
       self.index += 1;
       ret
     } else {
@@ -374,9 +462,13 @@ where
   type Output = T;
 
   fn index<'b>(&self, idx: usize) -> &Self::Output {
-    match self {
-      Empty => panic!("index out of bounds"),
-      Tree(t) => t.ref_get(idx).expect("failed to index"),
+    if idx >= self.len() {
+      panic!("{} is out of bound at length {}", idx, self.len())
+    } else {
+      match self {
+        Empty => panic!("list is empty to index"),
+        Tree(t) => t.loop_get(idx),
+      }
     }
   }
 }
@@ -386,7 +478,6 @@ where
   T: Clone + Display + Eq + PartialEq + Debug + Ord + PartialOrd + Hash,
 {
   fn hash<H: Hasher>(&self, state: &mut H) {
-    "ternary".hash(state);
     match self {
       Empty => {}
       Tree(t) => t.hash(state),
