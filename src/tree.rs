@@ -4,7 +4,7 @@
 
 mod finger;
 
-use std::cell::RefCell;
+use std::cell::Cell;
 use std::cmp::Ordering;
 use std::fmt;
 use std::fmt::{Debug, Display};
@@ -213,7 +213,7 @@ where
   /// internal usages for rebuilding tree
   fn to_leaves(&self) -> Vec<TernaryTree<T>> {
     let mut acc: Vec<TernaryTree<T>> = Vec::with_capacity(self.len());
-    let counter: RefCell<usize> = RefCell::new(0);
+    let counter: Cell<usize> = Cell::new(0);
     write_leaves(self, &mut acc, &counter);
     assert_eq!(acc.len(), self.len());
     acc
@@ -254,35 +254,34 @@ where
   /// get am element via drilling down the branch with a mutable loop,
   /// supposed to be faster than `ref_get` since it's more like VM instructions
   pub fn loop_get(&'a self, original_idx: usize) -> &'a T {
-    let r = RefCell::new(self);
-    let mut tree_parent = r.borrow_mut();
+    let tree_parent = Cell::new(self);
     let mut idx = original_idx;
     loop {
-      match *tree_parent {
+      match tree_parent.get() {
         Leaf(value) => {
-          return value;
+          return &*value;
         }
         Branch2 { left, middle, .. } => {
           if idx < left.len() {
-            *tree_parent = left;
+            tree_parent.set(left);
           } else {
-            *tree_parent = middle;
+            tree_parent.set(middle);
             idx -= left.len();
           }
         }
         Branch3 { left, middle, right, .. } => {
           if idx < left.len() {
-            *tree_parent = left;
+            tree_parent.set(left);
             continue;
           }
           idx -= left.len();
 
           if idx < middle.len() {
-            *tree_parent = middle;
+            tree_parent.set(middle);
             continue;
           }
 
-          *tree_parent = right;
+          tree_parent.set(right);
           idx -= middle.len();
         }
       }
@@ -976,7 +975,7 @@ where
   fn next(&mut self) -> Option<Self::Item> {
     if self.index < self.value.len() {
       // println!("get: {} {}", self.value.format_inline(), self.index);
-      let ret = self.value.loop_get(self.index);
+      let ret = self.value.ref_get(self.index);
       self.index += 1;
       Some(ret)
     } else {
@@ -992,7 +991,7 @@ impl<T: Clone + Display + Eq + PartialEq + Debug + Ord + PartialOrd + Hash> Part
     }
 
     for idx in 0..ys.len() {
-      if self.loop_get(idx) != ys.loop_get(idx) {
+      if self.ref_get(idx) != ys.ref_get(idx) {
         return false;
       }
     }
@@ -1019,7 +1018,7 @@ where
   fn cmp(&self, other: &Self) -> Ordering {
     if self.len() == other.len() {
       for idx in 0..self.len() {
-        match self.loop_get(idx).cmp(other.loop_get(idx)) {
+        match self.ref_get(idx).cmp(other.ref_get(idx)) {
           Ordering::Equal => {}
           a => return a,
         }
@@ -1040,7 +1039,7 @@ where
 
   fn index<'b>(&self, idx: usize) -> &Self::Output {
     // println!("get: {} {}", self.format_inline(), idx);
-    self.loop_get(idx)
+    self.ref_get(idx)
   }
 }
 
@@ -1067,7 +1066,7 @@ where
 }
 
 /// internal function for mutable writing
-fn write_leaves<T>(xs: &TernaryTree<T>, acc: &mut Vec<TernaryTree<T>>, counter: &RefCell<usize>)
+fn write_leaves<T>(xs: &TernaryTree<T>, acc: &mut Vec<TernaryTree<T>>, counter: &Cell<usize>)
 where
   T: Clone + Display + Eq + PartialEq + Debug + Ord + PartialOrd + Hash,
 {
