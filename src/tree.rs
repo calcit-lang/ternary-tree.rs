@@ -259,7 +259,7 @@ where
     loop {
       match tree_parent.get() {
         Leaf(value) => {
-          return &*value;
+          return value;
         }
         Branch2 { left, middle, .. } => {
           if idx < left.len() {

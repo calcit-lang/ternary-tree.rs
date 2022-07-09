@@ -19,7 +19,7 @@ use std::sync::Arc;
 
 use crate::util::triple_size;
 
-impl<'a, T> TernaryTree<T>
+impl<T> TernaryTree<T>
 where
   T: Clone + Display + Eq + PartialEq + Debug + Ord + PartialOrd + Hash,
 {

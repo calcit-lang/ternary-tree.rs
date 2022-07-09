@@ -36,7 +36,7 @@ pub enum TernaryTreeList<T> {
 
 use TernaryTreeList::*;
 
-impl<'a, T> TernaryTreeList<T>
+impl<T> TernaryTreeList<T>
 where
   T: Clone + Display + Eq + PartialEq + Debug + Ord + PartialOrd + Hash,
 {
@@ -135,7 +135,7 @@ where
       Empty => Err(String::from("empty")),
       Tree(t) => {
         if idx > self.len() - 1 {
-          return Err(format!("Index too large {} for {}", idx, self.format_inline()));
+          Err(format!("Index too large {} for {}", idx, self.format_inline()))
         } else {
           Ok(TernaryTreeList::Tree(t.assoc(idx, item)?))
         }
