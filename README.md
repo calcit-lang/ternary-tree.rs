@@ -1,4 +1,4 @@
-## Persistetnt structrual sharing tree for Calcit
+## Persistent structrual sharing tree for Calcit
 
 > a variant of 2-3 tree, with enhancements on ternary branching, optimized with tricks like finger-tree.
 

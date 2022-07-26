@@ -379,7 +379,7 @@ where
               middle: middle.to_owned(),
             })
           }
-        } else if left.len() == 1 {
+        } else if middle.len() == 1 {
           Ok((**left).to_owned())
         } else {
           let changed_branch = middle.dissoc(idx - left.len())?;
