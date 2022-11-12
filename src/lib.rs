@@ -34,6 +34,7 @@ pub enum TernaryTreeList<T> {
   Tree(TernaryTree<T>),
 }
 
+use tree::TernaryTreeIntoIter;
 use TernaryTreeList::*;
 
 impl<T> TernaryTreeList<T>
@@ -371,8 +372,14 @@ where
     }
   }
 
+  // TODO should be auto handled
   pub fn iter(&self) -> TernaryTreeListRefIntoIterator<T> {
-    TernaryTreeListRefIntoIterator { value: self, index: 0 }
+    match self.to_owned() {
+      Empty => TernaryTreeListRefIntoIterator { real_iter: None },
+      Tree(t) => TernaryTreeListRefIntoIterator {
+        real_iter: Some(t.into_iter()),
+      },
+    }
   }
 }
 
@@ -388,37 +395,37 @@ where
   }
 }
 
+pub struct TernaryTreeListRefIntoIterator<T> {
+  real_iter: Option<TernaryTreeIntoIter<T>>,
+}
+
 // experimental code to turn `&TernaryTree<_>` into iterator
-impl<'a, T> IntoIterator for &'a TernaryTreeList<T>
+impl<T> IntoIterator for TernaryTreeList<T>
 where
   T: Clone + Display + Eq + PartialEq + Debug + Ord + PartialOrd + Hash,
 {
-  type Item = &'a T;
-  type IntoIter = TernaryTreeListRefIntoIterator<'a, T>;
+  type Item = Arc<T>;
+  type IntoIter = TernaryTreeListRefIntoIterator<T>;
 
   fn into_iter(self) -> Self::IntoIter {
-    TernaryTreeListRefIntoIterator { value: self, index: 0 }
+    match self {
+      Empty => TernaryTreeListRefIntoIterator { real_iter: None },
+      Tree(t) => TernaryTreeListRefIntoIterator {
+        real_iter: Some(t.into_iter()),
+      },
+    }
   }
 }
 
-pub struct TernaryTreeListRefIntoIterator<'a, T> {
-  value: &'a TernaryTreeList<T>,
-  index: usize,
-}
-
-impl<'a, T> Iterator for TernaryTreeListRefIntoIterator<'a, T>
+impl<T> Iterator for TernaryTreeListRefIntoIterator<T>
 where
   T: Clone + Display + Eq + PartialEq + Debug + Ord + PartialOrd + Hash,
 {
-  type Item = &'a T;
+  type Item = Arc<T>;
   fn next(&mut self) -> Option<Self::Item> {
-    if self.index < self.value.len() {
-      // println!("get: {} {}", self.value.format_inline(), self.index);
-      let ret = self.value.ref_get(self.index);
-      self.index += 1;
-      ret
-    } else {
-      None
+    match &mut self.real_iter {
+      None => None,
+      Some(iter) => iter.next(),
     }
   }
 }

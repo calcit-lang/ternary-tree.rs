@@ -3,6 +3,7 @@
 //! checks can be added at the struct that wraps this tree
 
 mod finger;
+mod iter;
 
 use std::cell::Cell;
 use std::cmp::Ordering;
@@ -13,6 +14,8 @@ use std::ops::Index;
 use std::sync::Arc;
 
 use crate::util::{divide_ternary_sizes, triple_size};
+
+pub use iter::TernaryTreeIntoIter;
 
 /// internal tree structure, it can't be empty
 #[derive(Clone, Debug)]
@@ -33,10 +36,7 @@ pub enum TernaryTree<T> {
 
 use TernaryTree::*;
 
-impl<'a, T> TernaryTree<T>
-where
-  T: Clone + Display + Eq + PartialEq + Debug + Ord + PartialOrd + Hash,
-{
+impl<T> TernaryTree<T> {
   pub fn len(&self) -> usize {
     match self {
       Leaf { .. } => 1,
@@ -49,7 +49,12 @@ where
   pub fn is_empty(&self) -> bool {
     false
   }
+}
 
+impl<'a, T> TernaryTree<T>
+where
+  T: Clone + Display + Eq + PartialEq + Debug + Ord + PartialOrd + Hash,
+{
   /// make list again from existed
   /// use a factor to control side branches to be shallow with smaller depth
   /// root node has a factor of 2

@@ -217,6 +217,27 @@ fn criterion_benchmark(c: &mut Criterion) {
     })
   });
 
+  c.bench_function("iteration", |b| {
+    let mut data = TernaryTreeList::Empty;
+
+    for idx in 0..1000 {
+      data = data.push(idx)
+    }
+
+    b.iter(|| {
+      let mut effect = 0;
+      for x in data.to_owned() {
+        // no op
+        if *x >= 1000 {
+          effect += 1;
+        }
+      }
+      if effect > 1000 {
+        println!("effect: {}", effect);
+      }
+    })
+  });
+
   c.bench_function("get", |b| {
     let mut data = TernaryTreeList::Empty;
 

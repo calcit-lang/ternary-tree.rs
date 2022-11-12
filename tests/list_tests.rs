@@ -303,7 +303,7 @@ fn iterator() -> Result<(), String> {
   let data4 = TernaryTreeList::from(&origin4);
 
   let mut i = 0;
-  for _ in &data4 {
+  for _ in data4.to_owned() {
     i += 1;
   }
 
@@ -372,7 +372,7 @@ fn reverse() -> Result<(), String> {
 fn list_traverse() -> Result<(), String> {
   let mut i = 0;
   let data = TernaryTreeList::from(&[1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
-  for _ in &data {
+  for _ in data.to_owned() {
     i += 1;
   }
 
@@ -380,7 +380,7 @@ fn list_traverse() -> Result<(), String> {
 
   // makre sure &[_] work
   let data2 = &TernaryTreeList::from(&[1]);
-  for _ in data2 {
+  for _ in data2.to_owned() {
     i += 1;
   }
 
