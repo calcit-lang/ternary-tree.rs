@@ -284,6 +284,24 @@ where
     }
   }
 
+  /// split into 2 lists, either could be Empty
+  /// notice if index is too large, (Self, Empty) is returned, not providing index out of bound error
+  pub fn split(self, idx: usize) -> (Self, Self) {
+    if idx == 0 {
+      (Self::Empty, self)
+    } else if idx >= self.len() {
+      (self, Self::Empty)
+    } else {
+      match self {
+        Empty => (Self::Empty, Self::Empty),
+        Tree(t) => {
+          let (l, r) = t.split(idx);
+          (Self::Tree(l), Self::Tree(r))
+        }
+      }
+    }
+  }
+
   /// optimized for amortized `O(1)` at best cases, but copies a lot
   pub fn drop_right_shallow(&self) -> Self {
     match self {

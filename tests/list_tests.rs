@@ -443,3 +443,22 @@ fn dissoc_empty() -> Result<(), String> {
 
   Ok(())
 }
+
+#[test]
+fn split_values() -> Result<(), String> {
+  let n = 100;
+  let mut data = TernaryTreeList::from(&[]);
+  for idx in 0..n {
+    data = data.append(idx);
+  }
+  for i in 0..n {
+    let (left, right) = data.clone().split(i);
+    println!("left  {}", left.format_inline());
+    println!("right {}", right.format_inline());
+    println!("skip {}", data.skip(i)?.format_inline());
+    assert_eq!(left, data.take(i)?);
+    assert_eq!(right, data.skip(i)?);
+  }
+
+  Ok(())
+}

@@ -886,6 +886,120 @@ where
     }
   }
 
+  /// split at index, returns a tuple of two trees
+  /// this function takes ownership of the tree, and returns two new trees, release the original one
+  /// checks need to be done before calling this function
+  pub fn split(self, idx: usize) -> (Self, Self) {
+    match self {
+      Leaf(_value) => unreachable!("Invalid split index for a leaf: {}", idx),
+      Branch2 { left, middle, size } => {
+        if idx == 0 {
+          unreachable!("Invalid split index 0 for a branch2: {}", idx)
+        } else if idx < left.len() {
+          let (cut_a, cut_b) = (*left).clone().split(idx);
+
+          (
+            cut_a,
+            Branch2 {
+              size: size - idx,
+              left: Arc::new(cut_b),
+              middle: middle.to_owned(),
+            },
+          )
+        } else if idx == left.len() {
+          ((*left).to_owned(), (*middle).to_owned())
+        } else if idx >= size {
+          unreachable!("Invalid split index end for a branch2: {}", idx)
+        } else if idx - left.len() < middle.len() {
+          let (cut_a, cut_b) = (*middle).to_owned().split(idx - left.len());
+
+          (
+            Branch2 {
+              size: left.len() + cut_a.len(),
+              left: left.to_owned(),
+              middle: Arc::new(cut_a),
+            },
+            cut_b,
+          )
+        } else {
+          unreachable!("Invalid split index end for a branch2: {}", idx)
+        }
+      }
+      Branch3 { left, middle, right, size } => {
+        if idx == 0 {
+          unreachable!("Invalid split index 0 for a branch3: {}", idx)
+        } else if idx < left.len() {
+          let (cut_a, cut_b) = (*left).to_owned().split(idx);
+
+          (
+            cut_a,
+            Branch3 {
+              size: size - idx,
+              left: Arc::new(cut_b),
+              middle: middle.to_owned(),
+              right: right.to_owned(),
+            },
+          )
+        } else if idx == left.len() {
+          (
+            (*left).to_owned(),
+            Branch2 {
+              size: middle.len() + right.len(),
+              left: middle.to_owned(),
+              middle: right.to_owned(),
+            },
+          )
+        } else if idx - left.len() < middle.len() {
+          let (cut_a, cut_b) = (*middle).to_owned().split(idx - left.len());
+          (
+            Branch2 {
+              size: left.len() + cut_a.len(),
+              left: left.to_owned(),
+              middle: Arc::new(cut_a),
+            },
+            Branch2 {
+              size: cut_b.len() + right.len(),
+              left: Arc::new(cut_b),
+              middle: right.to_owned(),
+            },
+          )
+        } else if idx == left.len() + middle.len() {
+          (
+            Branch2 {
+              size: left.len() + middle.len(),
+              left: left.to_owned(),
+              middle: middle.to_owned(),
+            },
+            (*right).to_owned(),
+          )
+        } else if idx >= size {
+          unreachable!("Invalid split index end for a branch3: {}", idx)
+        } else if idx - left.len() == middle.len() {
+          (
+            Branch2 {
+              size: left.len() + middle.len(),
+              left: left.to_owned(),
+              middle: middle.to_owned(),
+            },
+            (*right).to_owned(),
+          )
+        } else {
+          let (cut_a, cut_b) = (*right).to_owned().split(idx - left.len() - middle.len());
+
+          (
+            Branch3 {
+              size: left.len() + middle.len() + cut_a.len(),
+              left: left.to_owned(),
+              middle: middle.to_owned(),
+              right: Arc::new(cut_a),
+            },
+            cut_b,
+          )
+        }
+      }
+    }
+  }
+
   pub fn skip(&self, idx: usize) -> Result<Self, String> {
     self.slice(idx, self.len())
   }
