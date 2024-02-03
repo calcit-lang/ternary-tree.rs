@@ -17,7 +17,7 @@ use crate::util::{divide_ternary_sizes, triple_size};
 /// internal tree structure, it can't be empty
 #[derive(Clone, Debug)]
 pub enum TernaryTree<T> {
-  Leaf(Arc<T>),
+  Leaf(T),
   Branch2 {
     size: usize,
     left: Arc<TernaryTree<T>>,
@@ -166,7 +166,7 @@ where
   pub fn index_of(&self, item: &T) -> Option<usize> {
     match self {
       Leaf(value) => {
-        if item == &**value {
+        if item == value {
           Some(0)
         } else {
           None
@@ -309,7 +309,7 @@ where
     match self {
       Leaf { .. } => {
         if idx == 0 {
-          Ok(Leaf(Arc::new(item)))
+          Ok(Leaf(item))
         } else {
           Err(format!("Cannot assoc leaf into index {}", idx))
         }
@@ -474,12 +474,12 @@ where
           Ok(Branch2 {
             size: 2,
             left: Arc::new(self.to_owned()),
-            middle: Arc::new(Leaf(Arc::new(item))),
+            middle: Arc::new(Leaf(item)),
           })
         } else {
           Ok(Branch2 {
             size: 2,
-            left: Arc::new(Leaf(Arc::new(item))),
+            left: Arc::new(Leaf(item)),
             middle: Arc::new(self.to_owned()),
           })
         }
@@ -492,12 +492,12 @@ where
             return Ok(Branch2 {
               size: 2,
               left: left.to_owned(),
-              middle: Arc::new(Leaf(Arc::new(item))),
+              middle: Arc::new(Leaf(item)),
             });
           } else {
             return Ok(Branch2 {
               size: 2,
-              left: Arc::new(Leaf(Arc::new(item))),
+              left: Arc::new(Leaf(item)),
               middle: left.to_owned(),
             });
           }
@@ -509,7 +509,7 @@ where
               return Ok(Branch3 {
                 size: 3,
                 left: left.to_owned(),
-                middle: Arc::new(Leaf(Arc::new(item))),
+                middle: Arc::new(Leaf(item)),
                 right: middle.to_owned(),
               });
             }
@@ -518,7 +518,7 @@ where
                 size: 3,
                 left: left.to_owned(),
                 middle: middle.to_owned(),
-                right: Arc::new(Leaf(Arc::new(item))),
+                right: Arc::new(Leaf(item)),
               });
             } else {
               return Err(String::from("cannot insert after position 2 since only 2 elements here"));
@@ -526,7 +526,7 @@ where
           } else if idx == 0 {
             return Ok(Branch3 {
               size: 3,
-              left: Arc::new(Leaf(Arc::new(item))),
+              left: Arc::new(Leaf(item)),
               middle: left.to_owned(),
               right: middle.to_owned(),
             });
@@ -534,7 +534,7 @@ where
             return Ok(Branch3 {
               size: 3,
               left: left.to_owned(),
-              middle: Arc::new(Leaf(Arc::new(item))),
+              middle: Arc::new(Leaf(item)),
               right: middle.to_owned(),
             });
           } else {
@@ -551,7 +551,7 @@ where
         if idx == 0 && !after {
           return Ok(Branch3 {
             size: *size + 1,
-            left: Arc::new(Leaf(Arc::new(item))),
+            left: Arc::new(Leaf(item)),
             middle: left.to_owned(),
             right: middle.to_owned(),
           });
@@ -562,7 +562,7 @@ where
             size: *size + 1,
             left: left.to_owned(),
             middle: middle.to_owned(),
-            right: Arc::new(Leaf(Arc::new(item))),
+            right: Arc::new(Leaf(item)),
           });
         }
 
@@ -592,12 +592,12 @@ where
             return Ok(Branch2 {
               size: 2,
               left: left.to_owned(),
-              middle: Arc::new(Leaf(Arc::new(item))),
+              middle: Arc::new(Leaf(item)),
             });
           } else {
             return Ok(Branch2 {
               size: 2,
-              left: Arc::new(Leaf(Arc::new(item))),
+              left: Arc::new(Leaf(item)),
               middle: left.to_owned(),
             });
           }
@@ -609,7 +609,7 @@ where
               return Ok(Branch3 {
                 size: 3,
                 left: left.to_owned(),
-                middle: Arc::new(Leaf(Arc::new(item))),
+                middle: Arc::new(Leaf(item)),
                 right: middle.to_owned(),
               });
             }
@@ -618,7 +618,7 @@ where
                 size: 3,
                 left: left.to_owned(),
                 middle: middle.to_owned(),
-                right: Arc::new(Leaf(Arc::new(item))),
+                right: Arc::new(Leaf(item)),
               });
             } else {
               return Err(String::from("cannot insert after position 2 since only 2 elements here"));
@@ -626,7 +626,7 @@ where
           } else if idx == 0 {
             return Ok(Branch3 {
               size: 3,
-              left: Arc::new(Leaf(Arc::new(item))),
+              left: Arc::new(Leaf(item)),
               middle: left.to_owned(),
               right: middle.to_owned(),
             });
@@ -634,7 +634,7 @@ where
             return Ok(Branch3 {
               size: 3,
               left: left.to_owned(),
-              middle: Arc::new(Leaf(Arc::new(item))),
+              middle: Arc::new(Leaf(item)),
               right: middle.to_owned(),
             });
           } else {
@@ -651,7 +651,7 @@ where
         if idx == 0 && !after && left.len() >= middle.len() && left.len() >= right.len() {
           return Ok(Branch2 {
             size: *size + 1,
-            left: Arc::new(Leaf(Arc::new(item))),
+            left: Arc::new(Leaf(item)),
             middle: Arc::new(self.to_owned()),
           });
         }
@@ -660,7 +660,7 @@ where
           return Ok(Branch2 {
             size: *size + 1,
             left: Arc::new(self.to_owned()),
-            middle: Arc::new(Leaf(Arc::new(item))),
+            middle: Arc::new(Leaf(item)),
           });
         }
 
@@ -669,14 +669,14 @@ where
             size: *size + 1,
             left: left.to_owned(),
             middle: middle.to_owned(),
-            right: Arc::new(Leaf(Arc::new(item))),
+            right: Arc::new(Leaf(item)),
           });
         }
 
         if !after && idx == 0 && right.len() == 0 && middle.len() >= right.len() {
           return Ok(Branch3 {
             size: *size + 1,
-            left: Arc::new(Leaf(Arc::new(item))),
+            left: Arc::new(Leaf(item)),
             middle: left.to_owned(),
             right: middle.to_owned(),
           });
@@ -889,7 +889,7 @@ where
   /// split at index, returns a tuple of two trees
   /// this function takes ownership of the tree, and returns two new trees, release the original one
   /// checks need to be done before calling this function
-  pub fn split(self, idx: usize) -> (Self, Self) {
+  pub fn split(&self, idx: usize) -> (Self, Self) {
     match self {
       Leaf(_value) => unreachable!("Invalid split index for a leaf: {}", idx),
       Branch2 { left, middle, size } => {
@@ -907,11 +907,11 @@ where
             },
           )
         } else if idx == left.len() {
-          ((*left).to_owned(), (*middle).to_owned())
-        } else if idx >= size {
+          ((**left).to_owned(), (**middle).to_owned())
+        } else if idx >= *size {
           unreachable!("Invalid split index end for a branch2: {}", idx)
         } else if idx - left.len() < middle.len() {
-          let (cut_a, cut_b) = (*middle).to_owned().split(idx - left.len());
+          let (cut_a, cut_b) = middle.split(idx - left.len());
 
           (
             Branch2 {
@@ -929,7 +929,7 @@ where
         if idx == 0 {
           unreachable!("Invalid split index 0 for a branch3: {}", idx)
         } else if idx < left.len() {
-          let (cut_a, cut_b) = (*left).to_owned().split(idx);
+          let (cut_a, cut_b) = (*left).split(idx);
 
           (
             cut_a,
@@ -942,7 +942,7 @@ where
           )
         } else if idx == left.len() {
           (
-            (*left).to_owned(),
+            (**left).to_owned(),
             Branch2 {
               size: middle.len() + right.len(),
               left: middle.to_owned(),
@@ -950,7 +950,7 @@ where
             },
           )
         } else if idx - left.len() < middle.len() {
-          let (cut_a, cut_b) = (*middle).to_owned().split(idx - left.len());
+          let (cut_a, cut_b) = (*middle).split(idx - left.len());
           (
             Branch2 {
               size: left.len() + cut_a.len(),
@@ -970,9 +970,9 @@ where
               left: left.to_owned(),
               middle: middle.to_owned(),
             },
-            (*right).to_owned(),
+            (**right).to_owned(),
           )
-        } else if idx >= size {
+        } else if idx >= *size {
           unreachable!("Invalid split index end for a branch3: {}", idx)
         } else if idx - left.len() == middle.len() {
           (
@@ -981,10 +981,10 @@ where
               left: left.to_owned(),
               middle: middle.to_owned(),
             },
-            (*right).to_owned(),
+            (**right).to_owned(),
           )
         } else {
-          let (cut_a, cut_b) = (*right).to_owned().split(idx - left.len() - middle.len());
+          let (cut_a, cut_b) = (*right).split(idx - left.len() - middle.len());
 
           (
             Branch3 {
@@ -1026,7 +1026,7 @@ where
   }
   pub fn map<V>(&self, f: Arc<dyn Fn(&T) -> V>) -> TernaryTree<V> {
     match self {
-      Leaf(value) => Leaf(Arc::new(f(value))),
+      Leaf(value) => Leaf(f(value)),
       Branch2 { left, middle, size } => Branch2 {
         size: *size,
         left: Arc::new(left.map(f.clone())),

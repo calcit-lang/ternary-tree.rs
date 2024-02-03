@@ -184,7 +184,7 @@ where
     match self {
       Empty => {
         if idx == 0 {
-          Ok(TernaryTreeList::Tree(TernaryTree::Leaf(Arc::new(item))))
+          Ok(TernaryTreeList::Tree(TernaryTree::Leaf(item)))
         } else {
           Err(String::from("inserting into empty, but index is not 0"))
         }
@@ -212,7 +212,7 @@ where
   }
   pub fn prepend(&self, item: T) -> Self {
     match self {
-      Empty => TernaryTreeList::Tree(TernaryTree::Leaf(Arc::new(item))),
+      Empty => TernaryTreeList::Tree(TernaryTree::Leaf(item)),
       Tree(t) => TernaryTreeList::Tree(t.prepend(item)),
     }
   }
@@ -222,21 +222,21 @@ where
   /// insert_after last element, this not optimzed for performance
   pub fn append(&self, item: T) -> Self {
     match self {
-      Empty => TernaryTreeList::Tree(TernaryTree::Leaf(Arc::new(item))),
+      Empty => TernaryTreeList::Tree(TernaryTree::Leaf(item)),
       Tree(t) => TernaryTreeList::Tree(t.append(item)),
     }
   }
   /// optimized for amortized `O(1)` performance at best cases
   pub fn push_right(&self, item: T) -> Self {
     match self {
-      Empty => TernaryTreeList::Tree(TernaryTree::Leaf(Arc::new(item))),
+      Empty => TernaryTreeList::Tree(TernaryTree::Leaf(item)),
       Tree(t) => TernaryTreeList::Tree(t.push_right(item)),
     }
   }
   /// optimized for amortized `O(1)` performance at best cases
   pub fn push_left(&self, item: T) -> Self {
     match self {
-      Empty => TernaryTreeList::Tree(TernaryTree::Leaf(Arc::new(item))),
+      Empty => TernaryTreeList::Tree(TernaryTree::Leaf(item)),
       Tree(t) => TernaryTreeList::Tree(t.push_left(item)),
     }
   }
@@ -516,7 +516,7 @@ where
     } else {
       let mut ys: Vec<TernaryTree<T>> = Vec::with_capacity(xs.len());
       for x in &xs {
-        ys.push(Leaf(Arc::new(x.to_owned())))
+        ys.push(Leaf(x.to_owned()))
       }
 
       TernaryTreeList::Tree(TernaryTree::rebuild_list(xs.len(), 0, &ys, 2))
@@ -534,7 +534,7 @@ where
     } else {
       let mut ys: Vec<TernaryTree<T>> = Vec::with_capacity(xs.len());
       for x in xs {
-        ys.push(Leaf(Arc::new(x.to_owned())))
+        ys.push(Leaf(x.to_owned()))
       }
 
       TernaryTreeList::Tree(TernaryTree::rebuild_list(xs.len(), 0, &ys, 2))
@@ -553,7 +553,7 @@ where
     } else {
       let mut ys: Vec<TernaryTree<T>> = Vec::with_capacity(xs.len());
       for x in xs {
-        ys.push(Leaf(Arc::new(x.to_owned())))
+        ys.push(Leaf(x.to_owned()))
       }
 
       TernaryTreeList::Tree(TernaryTree::rebuild_list(xs.len(), 0, &ys, 2))
