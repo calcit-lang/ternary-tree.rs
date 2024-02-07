@@ -62,6 +62,16 @@ where
     }
   }
 
+  /// items in debug display
+  pub fn format_debug(&self) -> String {
+    let mut s = String::from("(TernaryTreeList debug");
+    for x in self.iter() {
+      s.push_str(&format!(" {:?}", x));
+    }
+    s.push(')');
+    s
+  }
+
   /// get element in list by reference
   /// PERF: recursive function is slower than iterative loop with Cell in bench(using `usize`),
   /// however, Calcit is heavy in cloning(reference though... according real practice),
@@ -87,6 +97,14 @@ where
     match self {
       Empty => None,
       Tree(t) => t.index_of(item),
+    }
+  }
+
+  /// index of element from end, return 0 if found at last
+  pub fn last_index_of(&self, item: &T) -> Option<usize> {
+    match self {
+      Empty => None,
+      Tree(t) => t.last_index_of(item),
     }
   }
 

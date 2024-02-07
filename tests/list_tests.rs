@@ -7,7 +7,7 @@ use std::sync::Arc;
 fn init_list() -> Result<(), String> {
   assert_eq!(
     TernaryTreeList::from(&[1, 2, 3, 4]).to_string(),
-    String::from("TernaryTree[4, ...]")
+    String::from("(TernaryTree 1 2 3 4)")
   );
 
   let origin11 = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11];

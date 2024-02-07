@@ -180,6 +180,26 @@ where
     }
   }
 
+  // index from end, returns 0 when item found at end of original list
+  pub fn last_index_of(&self, item: &T) -> Option<usize> {
+    match self {
+      Leaf(value) => {
+        if item == value {
+          Some(0)
+        } else {
+          None
+        }
+      }
+      Branch2 { left, middle, .. } => middle
+        .last_index_of(item)
+        .or_else(|| left.last_index_of(item).map(|pos| pos + middle.len())),
+      Branch3 { left, middle, right, .. } => right
+        .last_index_of(item)
+        .or_else(|| middle.last_index_of(item).map(|pos| pos + right.len()))
+        .or_else(|| left.last_index_of(item).map(|pos| pos + middle.len() + right.len())),
+    }
+  }
+
   /// recursively check structure
   pub fn eq_shape(&self, ys: &Self) -> bool {
     if self.len() != ys.len() {
@@ -1059,7 +1079,11 @@ where
   T: Clone + Display + Eq + PartialEq + Debug + Ord + PartialOrd + Hash,
 {
   fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-    write!(f, "TernaryTree[{}, ...]", self.len())
+    write!(f, "(TernaryTree")?;
+    for item in self.into_iter() {
+      write!(f, " {}", item)?;
+    }
+    write!(f, ")")
   }
 }
 
