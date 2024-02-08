@@ -239,6 +239,24 @@ where
     acc
   }
 
+  /// a quick path for leftmost leaf
+  pub fn ref_first(&self) -> Option<&T> {
+    match self {
+      Leaf(value) => Some(value),
+      Branch2 { left, .. } => left.ref_first(),
+      Branch3 { left, .. } => left.ref_first(),
+    }
+  }
+
+  /// a quick path for rightmost leaf
+  pub fn ref_last(&self) -> Option<&T> {
+    match self {
+      Leaf(value) => Some(value),
+      Branch2 { middle, .. } => middle.ref_last(),
+      Branch3 { right, .. } => right.ref_last(),
+    }
+  }
+
   /// get with reference, but index is not checked, returns last element if too large
   pub fn ref_get(&self, idx: usize) -> &T {
     // println!("get: {} {}", self.format_inline(), idx);
@@ -487,63 +505,21 @@ where
     }
   }
 
-  pub fn insert(&self, idx: usize, item: T, after: bool) -> Result<Self, String> {
+  pub fn insert_before(&self, idx: usize, item: T) -> Result<Self, String> {
     match self {
-      Leaf { .. } => {
-        if after {
-          Ok(Branch2 {
-            size: 2,
-            left: Arc::new(self.to_owned()),
-            middle: Arc::new(Leaf(item)),
-          })
-        } else {
-          Ok(Branch2 {
-            size: 2,
-            left: Arc::new(Leaf(item)),
-            middle: Arc::new(self.to_owned()),
-          })
-        }
-      }
+      Leaf { .. } => Ok(Branch2 {
+        size: 2,
+        left: Arc::new(Leaf(item)),
+        middle: Arc::new(self.to_owned()),
+      }),
 
       Branch2 { left, middle, size, .. } => {
-        if self.len() == 1 {
-          if after {
-            // in compact mode, values placed at left
-            return Ok(Branch2 {
-              size: 2,
-              left: left.to_owned(),
-              middle: Arc::new(Leaf(item)),
-            });
-          } else {
-            return Ok(Branch2 {
-              size: 2,
-              left: Arc::new(Leaf(item)),
-              middle: left.to_owned(),
-            });
-          }
+        if *size < 2 {
+          unreachable!("no branch2 with size smaller than 2")
         }
 
-        if self.len() == 2 {
-          if after {
-            if idx == 0 {
-              return Ok(Branch3 {
-                size: 3,
-                left: left.to_owned(),
-                middle: Arc::new(Leaf(item)),
-                right: middle.to_owned(),
-              });
-            }
-            if idx == 1 {
-              return Ok(Branch3 {
-                size: 3,
-                left: left.to_owned(),
-                middle: middle.to_owned(),
-                right: Arc::new(Leaf(item)),
-              });
-            } else {
-              return Err(String::from("cannot insert after position 2 since only 2 elements here"));
-            }
-          } else if idx == 0 {
+        if *size == 2 {
+          if idx == 0 {
             return Ok(Branch3 {
               size: 3,
               left: Arc::new(Leaf(item)),
@@ -568,7 +544,7 @@ where
 
         // echo "picking: ", idx, " ", left.len(), " ", middle.len(), " ", right.len()
 
-        if idx == 0 && !after {
+        if idx == 0 {
           return Ok(Branch3 {
             size: *size + 1,
             left: Arc::new(Leaf(item)),
@@ -577,24 +553,15 @@ where
           });
         }
 
-        if idx == *size - 1 && after {
-          return Ok(Branch3 {
-            size: *size + 1,
-            left: left.to_owned(),
-            middle: middle.to_owned(),
-            right: Arc::new(Leaf(item)),
-          });
-        }
-
         if idx < left.len() {
-          let changed_branch = left.insert(idx, item, after)?;
+          let changed_branch = left.insert_before(idx, item)?;
           Ok(Branch2 {
             size: *size + 1,
             left: Arc::new(changed_branch),
             middle: middle.to_owned(),
           })
         } else {
-          let changed_branch = middle.insert(idx - left.len(), item, after)?;
+          let changed_branch = middle.insert_before(idx - left.len(), item)?;
 
           Ok(Branch2 {
             size: *size + 1,
@@ -606,60 +573,8 @@ where
       Branch3 {
         left, middle, right, size, ..
       } => {
-        if self.len() == 1 {
-          if after {
-            // in compact mode, values placed at left
-            return Ok(Branch2 {
-              size: 2,
-              left: left.to_owned(),
-              middle: Arc::new(Leaf(item)),
-            });
-          } else {
-            return Ok(Branch2 {
-              size: 2,
-              left: Arc::new(Leaf(item)),
-              middle: left.to_owned(),
-            });
-          }
-        }
-
-        if self.len() == 2 {
-          if after {
-            if idx == 0 {
-              return Ok(Branch3 {
-                size: 3,
-                left: left.to_owned(),
-                middle: Arc::new(Leaf(item)),
-                right: middle.to_owned(),
-              });
-            }
-            if idx == 1 {
-              return Ok(Branch3 {
-                size: 3,
-                left: left.to_owned(),
-                middle: middle.to_owned(),
-                right: Arc::new(Leaf(item)),
-              });
-            } else {
-              return Err(String::from("cannot insert after position 2 since only 2 elements here"));
-            }
-          } else if idx == 0 {
-            return Ok(Branch3 {
-              size: 3,
-              left: Arc::new(Leaf(item)),
-              middle: left.to_owned(),
-              right: middle.to_owned(),
-            });
-          } else if idx == 1 {
-            return Ok(Branch3 {
-              size: 3,
-              left: left.to_owned(),
-              middle: Arc::new(Leaf(item)),
-              right: middle.to_owned(),
-            });
-          } else {
-            return Err(String::from("cannot insert before position 2 since only 2 elements here"));
-          }
+        if *size < 3 {
+          unreachable!("no branch3 with size smaller than 3")
         }
 
         if left.len() + middle.len() + right.len() != *size {
@@ -668,7 +583,7 @@ where
 
         // echo "picking: ", idx, " ", left.len(), " ", middle.len(), " ", right.len()
 
-        if idx == 0 && !after && left.len() >= middle.len() && left.len() >= right.len() {
+        if idx == 0 && left.len() >= middle.len() && left.len() >= right.len() {
           return Ok(Branch2 {
             size: *size + 1,
             left: Arc::new(Leaf(item)),
@@ -676,24 +591,7 @@ where
           });
         }
 
-        if idx == *size - 1 && after && right.len() >= middle.len() && right.len() >= left.len() {
-          return Ok(Branch2 {
-            size: *size + 1,
-            left: Arc::new(self.to_owned()),
-            middle: Arc::new(Leaf(item)),
-          });
-        }
-
-        if after && idx == *size - 1 && right.len() == 0 && middle.len() >= left.len() {
-          return Ok(Branch3 {
-            size: *size + 1,
-            left: left.to_owned(),
-            middle: middle.to_owned(),
-            right: Arc::new(Leaf(item)),
-          });
-        }
-
-        if !after && idx == 0 && right.len() == 0 && middle.len() >= right.len() {
+        if idx == 0 && right.len() == 0 && middle.len() >= right.len() {
           return Ok(Branch3 {
             size: *size + 1,
             left: Arc::new(Leaf(item)),
@@ -703,7 +601,7 @@ where
         }
 
         if idx < left.len() {
-          let changed_branch = left.insert(idx, item, after)?;
+          let changed_branch = left.insert_before(idx, item)?;
           Ok(Branch3 {
             size: *size + 1,
             left: Arc::new(changed_branch),
@@ -711,7 +609,7 @@ where
             right: right.to_owned(),
           })
         } else if idx < left.len() + middle.len() {
-          let changed_branch = middle.insert(idx - left.len(), item, after)?;
+          let changed_branch = middle.insert_before(idx - left.len(), item)?;
 
           Ok(Branch3 {
             size: *size + 1,
@@ -720,7 +618,7 @@ where
             right: right.to_owned(),
           })
         } else {
-          let changed_branch = right.insert(idx - left.len() - middle.len(), item, after)?;
+          let changed_branch = right.insert_before(idx - left.len() - middle.len(), item)?;
 
           Ok(Branch3 {
             size: *size + 1,
@@ -732,11 +630,139 @@ where
       }
     }
   }
+
+  pub fn insert_after(&self, idx: usize, item: T) -> Result<Self, String> {
+    match self {
+      Leaf { .. } => Ok(Branch2 {
+        size: 2,
+        left: Arc::new(self.to_owned()),
+        middle: Arc::new(Leaf(item)),
+      }),
+
+      Branch2 { left, middle, size, .. } => {
+        if *size < 2 {
+          unreachable!("no branch2 with size smaller than 2")
+        }
+
+        if *size == 2 {
+          if idx == 0 {
+            return Ok(Branch3 {
+              size: 3,
+              left: left.to_owned(),
+              middle: Arc::new(Leaf(item)),
+              right: middle.to_owned(),
+            });
+          }
+          if idx == 1 {
+            return Ok(Branch3 {
+              size: 3,
+              left: left.to_owned(),
+              middle: middle.to_owned(),
+              right: Arc::new(Leaf(item)),
+            });
+          } else {
+            return Err(String::from("cannot insert after position 2 since only 2 elements here"));
+          }
+        }
+
+        if left.len() + middle.len() != *size {
+          return Err(String::from("tree.size does not match sum case branch sizes"));
+        }
+
+        // echo "picking: ", idx, " ", left.len(), " ", middle.len(), " ", right.len()
+
+        if idx == *size - 1 {
+          return Ok(Branch3 {
+            size: *size + 1,
+            left: left.to_owned(),
+            middle: middle.to_owned(),
+            right: Arc::new(Leaf(item)),
+          });
+        }
+
+        if idx < left.len() {
+          let changed_branch = left.insert_after(idx, item)?;
+          Ok(Branch2 {
+            size: *size + 1,
+            left: Arc::new(changed_branch),
+            middle: middle.to_owned(),
+          })
+        } else {
+          let changed_branch = middle.insert_after(idx - left.len(), item)?;
+
+          Ok(Branch2 {
+            size: *size + 1,
+            left: left.to_owned(),
+            middle: Arc::new(changed_branch),
+          })
+        }
+      }
+      Branch3 {
+        left, middle, right, size, ..
+      } => {
+        if *size < 3 {
+          unreachable!("no branch3 with size smaller than 3")
+        }
+
+        if left.len() + middle.len() + right.len() != *size {
+          return Err(String::from("tree.size does not match sum case branch sizes"));
+        }
+
+        // echo "picking: ", idx, " ", left.len(), " ", middle.len(), " ", right.len()
+
+        if idx == *size - 1 && right.len() >= middle.len() && right.len() >= left.len() {
+          return Ok(Branch2 {
+            size: *size + 1,
+            left: Arc::new(self.to_owned()),
+            middle: Arc::new(Leaf(item)),
+          });
+        }
+
+        if idx == *size - 1 && right.len() == 0 && middle.len() >= left.len() {
+          return Ok(Branch3 {
+            size: *size + 1,
+            left: left.to_owned(),
+            middle: middle.to_owned(),
+            right: Arc::new(Leaf(item)),
+          });
+        }
+
+        if idx < left.len() {
+          let changed_branch = left.insert_after(idx, item)?;
+          Ok(Branch3 {
+            size: *size + 1,
+            left: Arc::new(changed_branch),
+            middle: middle.to_owned(),
+            right: right.to_owned(),
+          })
+        } else if idx < left.len() + middle.len() {
+          let changed_branch = middle.insert_after(idx - left.len(), item)?;
+
+          Ok(Branch3 {
+            size: *size + 1,
+            left: left.to_owned(),
+            middle: Arc::new(changed_branch),
+            right: right.to_owned(),
+          })
+        } else {
+          let changed_branch = right.insert_after(idx - left.len() - middle.len(), item)?;
+
+          Ok(Branch3 {
+            size: *size + 1,
+            left: left.to_owned(),
+            middle: middle.to_owned(),
+            right: Arc::new(changed_branch),
+          })
+        }
+      }
+    }
+  }
+
   pub fn assoc_before(&self, idx: usize, item: T) -> Result<Self, String> {
-    self.insert(idx, item, false)
+    self.insert_before(idx, item)
   }
   pub fn assoc_after(&self, idx: usize, item: T) -> Result<Self, String> {
-    self.insert(idx, item, true)
+    self.insert_after(idx, item)
   }
   // this function mutates original tree to make it more balanced
   pub fn force_inplace_balancing(&mut self) -> Result<(), String> {
@@ -749,21 +775,11 @@ where
     self.prepend(item)
   }
   pub fn prepend(&self, item: T) -> Self {
-    match self.insert(0, item, false) {
+    match self.insert_before(0, item) {
       Ok(v) => v,
       Err(e) => unreachable!("{}", e),
     }
   }
-  pub fn push(&self, item: T) -> Self {
-    self.append(item)
-  }
-  pub fn append(&self, item: T) -> Self {
-    match self.insert(self.len() - 1, item, true) {
-      Ok(v) => v,
-      Err(e) => unreachable!("{}", e),
-    }
-  }
-
   pub fn concat(raw: &[TernaryTree<T>]) -> Self {
     let mut xs_groups: Vec<TernaryTree<T>> = Vec::with_capacity(raw.len());
     for x in raw {
@@ -830,6 +846,123 @@ where
 
   /// excludes value at end_idx, kept aligned with JS & Clojure
   /// does not check at inside
+  pub fn take_left(&self, end_idx: usize) -> Result<Self, String> {
+    // echo "take_left {tree.formatListInline}: {start_idx}..{end_idx}"
+
+    match self {
+      Leaf { .. } => {
+        if end_idx == 1 {
+          Ok(self.to_owned())
+        } else {
+          Err(format!("Invalid take_left for a leaf: {}", end_idx))
+        }
+      }
+
+      Branch2 { left, middle, size } => {
+        if end_idx == *size {
+          Ok(self.to_owned())
+        } else if end_idx <= left.len() {
+          left.take_left(end_idx)
+        } else {
+          // take whole left and part of middle
+          let left_len = left.len();
+          let middle_cut = middle.take_left(end_idx - left_len)?;
+          Ok(TernaryTree::Branch2 {
+            size: left_len + middle_cut.len(),
+            left: left.to_owned(),
+            middle: Arc::new(middle_cut),
+          })
+        }
+      }
+      Branch3 { left, right, middle, size } => {
+        let base1 = left.len();
+        let base2 = base1 + middle.len();
+        if end_idx == *size {
+          Ok(self.to_owned())
+        } else if end_idx <= base1 {
+          left.take_left(end_idx)
+        } else if end_idx <= base2 {
+          // take whole left and part of middle
+          let middle_cut = middle.take_left(end_idx - base1)?;
+          Ok(TernaryTree::Branch2 {
+            size: left.len() + middle_cut.len(),
+            left: left.to_owned(),
+            middle: Arc::new(middle_cut),
+          })
+        } else {
+          let right_cut = right.take_left(end_idx - base2)?;
+          Ok(TernaryTree::Branch3 {
+            size: left.len() + middle.len() + right_cut.len(),
+            left: left.to_owned(),
+            middle: middle.clone(),
+            right: Arc::new(right_cut),
+          })
+        }
+      }
+    }
+  }
+
+  /// excludes value at end_idx, kept aligned with JS & Clojure
+  /// does not check at inside
+  pub fn take_right(&self, start_idx: usize) -> Result<Self, String> {
+    // println!("take right {}: {start_idx}", self.format_inline());
+
+    match self {
+      Leaf { .. } => {
+        if start_idx == 0 {
+          Ok(self.to_owned())
+        } else {
+          Err(format!("Invalid take_right range for a leaf: {}", start_idx,))
+        }
+      }
+
+      Branch2 { left, middle, .. } => {
+        if start_idx == 0 {
+          Ok(self.to_owned())
+        } else if start_idx >= left.len() {
+          // echo "sizes: {left.len()} {middle.len()} {right.len()}"
+          let left_len = left.len();
+          middle.take_right(start_idx - left_len)
+        } else {
+          // take part of left and whole middle
+          let left_cut = left.take_right(start_idx)?;
+          Ok(TernaryTree::Branch2 {
+            size: left_cut.len() + middle.len(),
+            left: Arc::new(left_cut),
+            middle: middle.to_owned(),
+          })
+        }
+      }
+      Branch3 { left, right, middle, .. } => {
+        let base1 = left.len();
+        let base2 = base1 + middle.len();
+        if start_idx == 0 {
+          Ok(self.to_owned())
+        } else if start_idx >= base2 {
+          right.take_right(start_idx - base2)
+        } else if start_idx >= base1 {
+          // take part of middle and whole right
+          let middle_cut = middle.take_right(start_idx - base1)?;
+          Ok(TernaryTree::Branch2 {
+            size: middle_cut.len() + right.len(),
+            left: Arc::new(middle_cut),
+            middle: right.to_owned(),
+          })
+        } else {
+          let left_cut = left.take_right(start_idx)?;
+          Ok(TernaryTree::Branch3 {
+            size: left_cut.len() + middle.len() + right.len(),
+            left: Arc::new(left_cut),
+            middle: middle.clone(),
+            right: right.to_owned(),
+          })
+        }
+      }
+    }
+  }
+
+  /// excludes value at end_idx, kept aligned with JS & Clojure
+  /// does not check at inside
   pub fn slice(&self, start_idx: usize, end_idx: usize) -> Result<Self, String> {
     // echo "slice {tree.formatListInline}: {start_idx}..{end_idx}"
 
@@ -842,17 +975,35 @@ where
         }
       }
 
-      Branch2 { left, middle, .. } => {
-        if start_idx == 0 && end_idx == self.len() {
+      Branch2 { left, middle, size } => {
+        if start_idx == 0 && end_idx == *size {
           Ok(self.to_owned())
         } else if start_idx >= left.len() {
           // echo "sizes: {left.len()} {middle.len()} {right.len()}"
-          middle.slice(start_idx - left.len(), end_idx - left.len())
+          let left_len = left.len();
+          middle.slice(start_idx - left_len, end_idx - left_len)
         } else if end_idx <= left.len() {
           left.slice(start_idx, end_idx)
+        } else if start_idx == 0 {
+          // take whole left and part of middle
+          let left_len = left.len();
+          let middle_cut = middle.take_left(end_idx - left_len)?;
+          Ok(TernaryTree::Branch2 {
+            size: left_len + middle_cut.len(),
+            left: left.to_owned(),
+            middle: Arc::new(middle_cut),
+          })
+        } else if end_idx == *size {
+          // take part of left and whole middle
+          let left_cut = left.take_right(start_idx)?;
+          Ok(TernaryTree::Branch2 {
+            size: left_cut.len() + middle.len(),
+            left: Arc::new(left_cut),
+            middle: middle.to_owned(),
+          })
         } else {
-          let left_cut = left.slice(start_idx, left.len())?;
-          let middle_cut = middle.slice(0, end_idx - left.len())?;
+          let left_cut = left.take_right(start_idx)?;
+          let middle_cut = middle.take_left(end_idx - left.len())?;
 
           Ok(TernaryTree::Branch2 {
             size: left_cut.len() + middle_cut.len(),
@@ -861,19 +1012,27 @@ where
           })
         }
       }
-      Branch3 { left, right, middle, .. } => {
+      Branch3 { left, right, middle, size } => {
         let base1 = left.len();
         let base2 = base1 + middle.len();
-        if start_idx == 0 && end_idx == self.len() {
+        if start_idx == 0 && end_idx == *size {
           Ok(self.to_owned())
         } else if start_idx >= base2 {
           right.slice(start_idx - base2, end_idx - base2)
         } else if start_idx >= base1 {
           if end_idx <= base1 + middle.len() {
             middle.slice(start_idx - base1, end_idx - base1)
+          } else if end_idx == *size {
+            // take part of middle and whole right
+            let middle_cut = middle.take_right(start_idx - base1)?;
+            Ok(TernaryTree::Branch2 {
+              size: middle_cut.len() + right.len(),
+              left: Arc::new(middle_cut),
+              middle: right.to_owned(),
+            })
           } else {
-            let middle_cut = middle.slice(start_idx - base1, middle.len())?;
-            let right_cut = right.slice(0, end_idx - base2)?;
+            let middle_cut = middle.take_right(start_idx - base1)?;
+            let right_cut = right.take_left(end_idx - base2)?;
 
             Ok(TernaryTree::Branch2 {
               size: middle_cut.len() + right_cut.len(),
@@ -884,17 +1043,27 @@ where
         } else if end_idx <= base1 {
           left.slice(start_idx, end_idx)
         } else if end_idx <= base2 {
-          let left_cut = left.slice(start_idx, base1)?;
-          let middle_cut = middle.slice(0, end_idx - base1)?;
+          if start_idx == 0 {
+            // take whole left and part of middle
+            let middle_cut = middle.take_left(end_idx - base1)?;
+            Ok(TernaryTree::Branch2 {
+              size: left.len() + middle_cut.len(),
+              left: left.to_owned(),
+              middle: Arc::new(middle_cut),
+            })
+          } else {
+            let left_cut = left.take_right(start_idx)?;
+            let middle_cut = middle.take_left(end_idx - base1)?;
 
-          Ok(TernaryTree::Branch2 {
-            size: left_cut.len() + middle_cut.len(),
-            left: Arc::new(left_cut),
-            middle: Arc::new(middle_cut),
-          })
+            Ok(TernaryTree::Branch2 {
+              size: left_cut.len() + middle_cut.len(),
+              left: Arc::new(left_cut),
+              middle: Arc::new(middle_cut),
+            })
+          }
         } else {
-          let left_cut = left.slice(start_idx, base1)?;
-          let right_cut = right.slice(0, end_idx - base2)?;
+          let left_cut = left.take_right(start_idx)?;
+          let right_cut = right.take_left(end_idx - base2)?;
           Ok(TernaryTree::Branch3 {
             size: left_cut.len() + middle.len() + right_cut.len(),
             left: Arc::new(left_cut),
@@ -1018,13 +1187,6 @@ where
         }
       }
     }
-  }
-
-  pub fn skip(&self, idx: usize) -> Result<Self, String> {
-    self.slice(idx, self.len())
-  }
-  pub fn take(&self, idx: usize) -> Result<Self, String> {
-    self.slice(0, idx)
   }
 
   pub fn reverse(&self) -> Self {

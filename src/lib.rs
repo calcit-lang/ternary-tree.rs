@@ -77,8 +77,19 @@ where
   /// however, Calcit is heavy in cloning(reference though... according real practice),
   /// so here we still choose `ref_get` for speed in Calcit project.
   pub fn get(&self, idx: usize) -> Option<&T> {
-    if self.is_empty() || idx >= self.len() {
+    let l = self.len();
+    if l == 0 || idx >= l {
       None
+    } else if idx == 0 {
+      match self {
+        Empty => None,
+        Tree(t) => t.ref_first(),
+      }
+    } else if idx == l - 1 {
+      match self {
+        Empty => None,
+        Tree(t) => t.ref_last(),
+      }
     } else {
       self.ref_get(idx)
     }
@@ -148,6 +159,8 @@ where
       Tree(t) => t.last(),
     }
   }
+
+  // at known index, update value
   pub fn assoc(&self, idx: usize, item: T) -> Result<Self, String> {
     match self {
       Empty => Err(String::from("empty")),
@@ -208,7 +221,13 @@ where
         }
       }
 
-      Tree(t) => Ok(TernaryTreeList::Tree(t.insert(idx, item, after)?)),
+      Tree(t) => {
+        if after {
+          Ok(TernaryTreeList::Tree(t.insert_after(idx, item)?))
+        } else {
+          Ok(TernaryTreeList::Tree(t.insert_before(idx, item)?))
+        }
+      }
     }
   }
   pub fn assoc_before(&self, idx: usize, item: T) -> Result<Self, String> {
@@ -241,7 +260,7 @@ where
   pub fn append(&self, item: T) -> Self {
     match self {
       Empty => TernaryTreeList::Tree(TernaryTree::Leaf(item)),
-      Tree(t) => TernaryTreeList::Tree(t.append(item)),
+      Tree(t) => TernaryTreeList::Tree(t.push_right(item)),
     }
   }
   /// optimized for amortized `O(1)` performance at best cases
@@ -381,10 +400,33 @@ where
   }
 
   pub fn skip(&self, idx: usize) -> Result<Self, String> {
-    self.slice(idx, self.len())
+    // self.slice(idx, self.len())
+
+    match self {
+      Empty => Ok(TernaryTreeList::Empty),
+      Tree(t) => {
+        let size = t.len();
+        match idx.cmp(&size) {
+          Ordering::Equal => Ok(TernaryTreeList::Empty),
+          Ordering::Greater => Err(format!("Skip range too large {} for {}", idx, self.format_inline())),
+          Ordering::Less => Ok(TernaryTreeList::Tree(t.take_right(idx)?)),
+        }
+      }
+    }
   }
   pub fn take(&self, idx: usize) -> Result<Self, String> {
-    self.slice(0, idx)
+    match self {
+      Empty => Ok(TernaryTreeList::Empty),
+      Tree(t) => {
+        if idx == 0 {
+          Ok(TernaryTreeList::Empty)
+        } else if idx > self.len() {
+          Err(format!("Take range too large {} for {}", idx, self.format_inline()))
+        } else {
+          Ok(TernaryTreeList::Tree(t.take_left(idx)?))
+        }
+      }
+    }
   }
 
   pub fn reverse(&self) -> Self {
