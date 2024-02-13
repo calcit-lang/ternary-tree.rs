@@ -292,34 +292,34 @@ where
   /// get am element via drilling down the branch with a mutable loop,
   /// supposed to be faster than `ref_get` since it's more like VM instructions
   pub fn loop_get(&'a self, original_idx: usize) -> &'a T {
-    let tree_parent = Cell::new(self);
+    let mut tree_parent = self;
     let mut idx = original_idx;
     loop {
-      match tree_parent.get() {
+      match tree_parent {
         Leaf(value) => {
           return value;
         }
         Branch2 { left, middle, .. } => {
           if idx < left.len() {
-            tree_parent.set(left);
+            tree_parent = left;
           } else {
-            tree_parent.set(middle);
+            tree_parent = middle;
             idx -= left.len();
           }
         }
         Branch3 { left, middle, right, .. } => {
           if idx < left.len() {
-            tree_parent.set(left);
+            tree_parent = left;
             continue;
           }
           idx -= left.len();
 
           if idx < middle.len() {
-            tree_parent.set(middle);
+            tree_parent = middle;
             continue;
           }
 
-          tree_parent.set(right);
+          tree_parent = right;
           idx -= middle.len();
         }
       }

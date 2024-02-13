@@ -548,7 +548,7 @@ where
     } else {
       match self {
         Empty => panic!("list is empty to index"),
-        Tree(t) => t.ref_get(idx),
+        Tree(t) => t.loop_get(idx),
       }
     }
   }
