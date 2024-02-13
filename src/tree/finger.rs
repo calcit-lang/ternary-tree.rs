@@ -235,12 +235,12 @@ where
 
   pub fn push_right(&self, item: T) -> Self {
     // start with 2 so its left child branch has capability of only 3^1
-    self.push_right_main(Leaf(Arc::new(item)), 2)
+    self.push_right_main(Leaf(item), 2)
   }
 
   pub fn push_left(&self, item: T) -> Self {
     // start with 2 so its left child branch has capability of only 3^1
-    self.push_left_main(Leaf(Arc::new(item)), 2)
+    self.push_left_main(Leaf(item), 2)
   }
 
   /// try to split a small bunch of elements under(or equal) a bound size,

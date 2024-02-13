@@ -62,13 +62,34 @@ where
     }
   }
 
+  /// items in debug display
+  pub fn format_debug(&self) -> String {
+    let mut s = String::from("(TernaryTreeList debug");
+    for x in self.iter() {
+      s.push_str(&format!(" {:?}", x));
+    }
+    s.push(')');
+    s
+  }
+
   /// get element in list by reference
   /// PERF: recursive function is slower than iterative loop with Cell in bench(using `usize`),
   /// however, Calcit is heavy in cloning(reference though... according real practice),
   /// so here we still choose `ref_get` for speed in Calcit project.
   pub fn get(&self, idx: usize) -> Option<&T> {
-    if self.is_empty() || idx >= self.len() {
+    let l = self.len();
+    if l == 0 || idx >= l {
       None
+    } else if idx == 0 {
+      match self {
+        Empty => None,
+        Tree(t) => t.ref_first(),
+      }
+    } else if idx == l - 1 {
+      match self {
+        Empty => None,
+        Tree(t) => t.ref_last(),
+      }
     } else {
       self.ref_get(idx)
     }
@@ -87,6 +108,14 @@ where
     match self {
       Empty => None,
       Tree(t) => t.index_of(item),
+    }
+  }
+
+  /// index of element from end, return 0 if found at last
+  pub fn last_index_of(&self, item: &T) -> Option<usize> {
+    match self {
+      Empty => None,
+      Tree(t) => t.last_index_of(item),
     }
   }
 
@@ -130,6 +159,8 @@ where
       Tree(t) => t.last(),
     }
   }
+
+  // at known index, update value
   pub fn assoc(&self, idx: usize, item: T) -> Result<Self, String> {
     match self {
       Empty => Err(String::from("empty")),
@@ -184,13 +215,19 @@ where
     match self {
       Empty => {
         if idx == 0 {
-          Ok(TernaryTreeList::Tree(TernaryTree::Leaf(Arc::new(item))))
+          Ok(TernaryTreeList::Tree(TernaryTree::Leaf(item)))
         } else {
           Err(String::from("inserting into empty, but index is not 0"))
         }
       }
 
-      Tree(t) => Ok(TernaryTreeList::Tree(t.insert(idx, item, after)?)),
+      Tree(t) => {
+        if after {
+          Ok(TernaryTreeList::Tree(t.insert_after(idx, item)?))
+        } else {
+          Ok(TernaryTreeList::Tree(t.insert_before(idx, item)?))
+        }
+      }
     }
   }
   pub fn assoc_before(&self, idx: usize, item: T) -> Result<Self, String> {
@@ -212,7 +249,7 @@ where
   }
   pub fn prepend(&self, item: T) -> Self {
     match self {
-      Empty => TernaryTreeList::Tree(TernaryTree::Leaf(Arc::new(item))),
+      Empty => TernaryTreeList::Tree(TernaryTree::Leaf(item)),
       Tree(t) => TernaryTreeList::Tree(t.prepend(item)),
     }
   }
@@ -222,21 +259,21 @@ where
   /// insert_after last element, this not optimzed for performance
   pub fn append(&self, item: T) -> Self {
     match self {
-      Empty => TernaryTreeList::Tree(TernaryTree::Leaf(Arc::new(item))),
-      Tree(t) => TernaryTreeList::Tree(t.append(item)),
+      Empty => TernaryTreeList::Tree(TernaryTree::Leaf(item)),
+      Tree(t) => TernaryTreeList::Tree(t.push_right(item)),
     }
   }
   /// optimized for amortized `O(1)` performance at best cases
   pub fn push_right(&self, item: T) -> Self {
     match self {
-      Empty => TernaryTreeList::Tree(TernaryTree::Leaf(Arc::new(item))),
+      Empty => TernaryTreeList::Tree(TernaryTree::Leaf(item)),
       Tree(t) => TernaryTreeList::Tree(t.push_right(item)),
     }
   }
   /// optimized for amortized `O(1)` performance at best cases
   pub fn push_left(&self, item: T) -> Self {
     match self {
-      Empty => TernaryTreeList::Tree(TernaryTree::Leaf(Arc::new(item))),
+      Empty => TernaryTreeList::Tree(TernaryTree::Leaf(item)),
       Tree(t) => TernaryTreeList::Tree(t.push_left(item)),
     }
   }
@@ -279,6 +316,24 @@ where
           Self::Empty
         } else {
           Self::Tree(t.drop_right())
+        }
+      }
+    }
+  }
+
+  /// split into 2 lists, either could be Empty
+  /// notice if index is too large, (Self, Empty) is returned, not providing index out of bound error
+  pub fn split(self, idx: usize) -> (Self, Self) {
+    if idx == 0 {
+      (Self::Empty, self)
+    } else if idx >= self.len() {
+      (self, Self::Empty)
+    } else {
+      match self {
+        Empty => (Self::Empty, Self::Empty),
+        Tree(t) => {
+          let (l, r) = t.split(idx);
+          (Self::Tree(l), Self::Tree(r))
         }
       }
     }
@@ -345,10 +400,33 @@ where
   }
 
   pub fn skip(&self, idx: usize) -> Result<Self, String> {
-    self.slice(idx, self.len())
+    // self.slice(idx, self.len())
+
+    match self {
+      Empty => Ok(TernaryTreeList::Empty),
+      Tree(t) => {
+        let size = t.len();
+        match idx.cmp(&size) {
+          Ordering::Equal => Ok(TernaryTreeList::Empty),
+          Ordering::Greater => Err(format!("Skip range too large {} for {}", idx, self.format_inline())),
+          Ordering::Less => Ok(TernaryTreeList::Tree(t.take_right(idx)?)),
+        }
+      }
+    }
   }
   pub fn take(&self, idx: usize) -> Result<Self, String> {
-    self.slice(0, idx)
+    match self {
+      Empty => Ok(TernaryTreeList::Empty),
+      Tree(t) => {
+        if idx == 0 {
+          Ok(TernaryTreeList::Empty)
+        } else if idx > self.len() {
+          Err(format!("Take range too large {} for {}", idx, self.format_inline()))
+        } else {
+          Ok(TernaryTreeList::Tree(t.take_left(idx)?))
+        }
+      }
+    }
   }
 
   pub fn reverse(&self) -> Self {
@@ -498,7 +576,7 @@ where
     } else {
       let mut ys: Vec<TernaryTree<T>> = Vec::with_capacity(xs.len());
       for x in &xs {
-        ys.push(Leaf(Arc::new(x.to_owned())))
+        ys.push(Leaf(x.to_owned()))
       }
 
       TernaryTreeList::Tree(TernaryTree::rebuild_list(xs.len(), 0, &ys, 2))
@@ -516,7 +594,7 @@ where
     } else {
       let mut ys: Vec<TernaryTree<T>> = Vec::with_capacity(xs.len());
       for x in xs {
-        ys.push(Leaf(Arc::new(x.to_owned())))
+        ys.push(Leaf(x.to_owned()))
       }
 
       TernaryTreeList::Tree(TernaryTree::rebuild_list(xs.len(), 0, &ys, 2))
@@ -535,7 +613,7 @@ where
     } else {
       let mut ys: Vec<TernaryTree<T>> = Vec::with_capacity(xs.len());
       for x in xs {
-        ys.push(Leaf(Arc::new(x.to_owned())))
+        ys.push(Leaf(x.to_owned()))
       }
 
       TernaryTreeList::Tree(TernaryTree::rebuild_list(xs.len(), 0, &ys, 2))

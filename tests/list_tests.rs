@@ -7,7 +7,7 @@ use std::sync::Arc;
 fn init_list() -> Result<(), String> {
   assert_eq!(
     TernaryTreeList::from(&[1, 2, 3, 4]).to_string(),
-    String::from("TernaryTree[4, ...]")
+    String::from("(TernaryTree 1 2 3 4)")
   );
 
   let origin11 = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11];
@@ -283,7 +283,7 @@ fn force_balancing() -> Result<(), String> {
   // echo data.formatInline
   assert_eq!(
     data.format_inline(),
-    String::from("((((0 1 2) 3 (4 5 6)) 7 ((8 9 10) 11 (12 13 14))) 15 ((16 17 18) 19))")
+    String::from("((0 1 2) (((3 4 5) (6 7 8) (9 10 11)) ((12 13 14) (15 16 17))) (18 19))") // deeper in middle
   );
   if let Err(msg) = data.force_inplace_balancing() {
     println!("[warning] {}", msg)
@@ -440,6 +440,25 @@ fn dissoc_empty() -> Result<(), String> {
   let data = TernaryTreeList::from(&[1]);
 
   assert_eq!(data.dissoc(0).unwrap(), TernaryTreeList::Empty);
+
+  Ok(())
+}
+
+#[test]
+fn split_values() -> Result<(), String> {
+  let n = 100;
+  let mut data = TernaryTreeList::from(&[]);
+  for idx in 0..n {
+    data = data.append(idx);
+  }
+  for i in 0..n {
+    let (left, right) = data.clone().split(i);
+    println!("left  {}", left.format_inline());
+    println!("right {}", right.format_inline());
+    println!("skip {}", data.skip(i)?.format_inline());
+    assert_eq!(left, data.take(i)?);
+    assert_eq!(right, data.skip(i)?);
+  }
 
   Ok(())
 }
