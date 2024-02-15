@@ -258,6 +258,20 @@ fn criterion_benchmark(c: &mut Criterion) {
       }
     })
   });
+
+  c.bench_function("first", |b| {
+    let mut data = TernaryTreeList::Empty;
+
+    for idx in 0..1000 {
+      data = data.push(idx)
+    }
+
+    b.iter(|| {
+      for _ in 0..10000 {
+        let _ = data.first();
+      }
+    })
+  });
 }
 
 criterion_group!(benches, criterion_benchmark);

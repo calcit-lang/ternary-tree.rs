@@ -91,7 +91,7 @@ where
         Tree(t) => t.ref_last(),
       }
     } else {
-      self.ref_get(idx)
+      self.loop_get(idx)
     }
   }
 
@@ -492,7 +492,7 @@ where
   fn next(&mut self) -> Option<Self::Item> {
     if self.index < self.value.len() {
       // println!("get: {} {}", self.value.format_inline(), self.index);
-      let ret = self.value.ref_get(self.index);
+      let ret = self.value.loop_get(self.index);
       self.index += 1;
       ret
     } else {

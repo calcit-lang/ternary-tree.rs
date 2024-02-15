@@ -1275,7 +1275,7 @@ where
   fn next(&mut self) -> Option<Self::Item> {
     if self.index < self.value.len() {
       // println!("get: {} {}", self.value.format_inline(), self.index);
-      let ret = self.value.ref_get(self.index);
+      let ret = self.value.loop_get(self.index);
       self.index += 1;
       Some(ret)
     } else {
@@ -1291,7 +1291,7 @@ impl<T: Clone + Display + Eq + PartialEq + Debug + Ord + PartialOrd + Hash> Part
     }
 
     for idx in 0..ys.len() {
-      if self.ref_get(idx) != ys.ref_get(idx) {
+      if self.loop_get(idx) != ys.loop_get(idx) {
         return false;
       }
     }
@@ -1318,7 +1318,7 @@ where
   fn cmp(&self, other: &Self) -> Ordering {
     if self.len() == other.len() {
       for idx in 0..self.len() {
-        match self.ref_get(idx).cmp(other.ref_get(idx)) {
+        match self.loop_get(idx).cmp(other.loop_get(idx)) {
           Ordering::Equal => {}
           a => return a,
         }
@@ -1339,7 +1339,7 @@ where
 
   fn index<'b>(&self, idx: usize) -> &Self::Output {
     // println!("get: {} {}", self.format_inline(), idx);
-    self.ref_get(idx)
+    self.loop_get(idx)
   }
 }
 
