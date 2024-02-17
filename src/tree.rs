@@ -239,24 +239,6 @@ where
     acc
   }
 
-  /// a quick path for leftmost leaf
-  pub fn ref_first(&self) -> Option<&T> {
-    match self {
-      Leaf(value) => Some(value),
-      Branch2 { left, .. } => left.ref_first(),
-      Branch3 { left, .. } => left.ref_first(),
-    }
-  }
-
-  /// a quick path for rightmost leaf
-  pub fn ref_last(&self) -> Option<&T> {
-    match self {
-      Leaf(value) => Some(value),
-      Branch2 { middle, .. } => middle.ref_last(),
-      Branch3 { right, .. } => right.ref_last(),
-    }
-  }
-
   /// get with reference, but index is not checked, returns last element if too large
   pub fn ref_get(&self, idx: usize) -> &T {
     // println!("get: {} {}", self.format_inline(), idx);
@@ -300,28 +282,54 @@ where
           return value;
         }
         Branch2 { left, middle, .. } => {
-          if idx < left.len() {
+          let left_size = left.len();
+          if idx < left_size {
             tree_parent = left;
           } else {
             tree_parent = middle;
-            idx -= left.len();
+            idx -= left_size;
           }
         }
         Branch3 { left, middle, right, .. } => {
-          if idx < left.len() {
+          let left_size = left.len();
+          if idx < left_size {
             tree_parent = left;
             continue;
           }
-          idx -= left.len();
+          idx -= left_size;
 
-          if idx < middle.len() {
+          let middle_size = middle.len();
+
+          if idx < middle_size {
             tree_parent = middle;
             continue;
           }
 
           tree_parent = right;
-          idx -= middle.len();
+          idx -= middle_size;
         }
+      }
+    }
+  }
+
+  pub fn loop_first(&'a self) -> &'a T {
+    let mut tree_parent = self;
+    loop {
+      match tree_parent {
+        Leaf(value) => return value,
+        Branch2 { left, .. } => tree_parent = left,
+        Branch3 { left, .. } => tree_parent = left,
+      }
+    }
+  }
+
+  pub fn loop_last(&'a self) -> &'a T {
+    let mut tree_parent = self;
+    loop {
+      match tree_parent {
+        Leaf(value) => return value,
+        Branch2 { middle, .. } => tree_parent = middle,
+        Branch3 { right, .. } => tree_parent = right,
       }
     }
   }
@@ -976,17 +984,18 @@ where
       }
 
       Branch2 { left, middle, size } => {
+        let left_size = left.len();
         if start_idx == 0 && end_idx == *size {
           Ok(self.to_owned())
-        } else if start_idx >= left.len() {
-          // echo "sizes: {left.len()} {middle.len()} {right.len()}"
-          let left_len = left.len();
+        } else if start_idx >= left_size {
+          // echo "sizes: {left_size} {middle.len()} {right.len()}"
+          let left_len = left_size;
           middle.slice(start_idx - left_len, end_idx - left_len)
-        } else if end_idx <= left.len() {
+        } else if end_idx <= left_size {
           left.slice(start_idx, end_idx)
         } else if start_idx == 0 {
           // take whole left and part of middle
-          let left_len = left.len();
+          let left_len = left_size;
           let middle_cut = middle.take_left(end_idx - left_len)?;
           Ok(TernaryTree::Branch2 {
             size: left_len + middle_cut.len(),
@@ -1003,7 +1012,7 @@ where
           })
         } else {
           let left_cut = left.take_right(start_idx)?;
-          let middle_cut = middle.take_left(end_idx - left.len())?;
+          let middle_cut = middle.take_left(end_idx - left_size)?;
 
           Ok(TernaryTree::Branch2 {
             size: left_cut.len() + middle_cut.len(),
@@ -1232,7 +1241,11 @@ where
   }
 
   pub fn iter(&self) -> TernaryTreeRefIntoIterator<T> {
-    TernaryTreeRefIntoIterator { value: self, index: 0 }
+    TernaryTreeRefIntoIterator {
+      value: self,
+      index: 0,
+      size: self.len(),
+    }
   }
 }
 
@@ -1258,13 +1271,18 @@ where
   type IntoIter = TernaryTreeRefIntoIterator<'a, T>;
 
   fn into_iter(self) -> Self::IntoIter {
-    TernaryTreeRefIntoIterator { value: self, index: 0 }
+    TernaryTreeRefIntoIterator {
+      value: self,
+      index: 0,
+      size: self.len(),
+    }
   }
 }
 
 pub struct TernaryTreeRefIntoIterator<'a, T> {
   value: &'a TernaryTree<T>,
   index: usize,
+  size: usize,
 }
 
 impl<'a, T> Iterator for TernaryTreeRefIntoIterator<'a, T>
@@ -1273,7 +1291,7 @@ where
 {
   type Item = &'a T;
   fn next(&mut self) -> Option<Self::Item> {
-    if self.index < self.value.len() {
+    if self.index < self.size {
       // println!("get: {} {}", self.value.format_inline(), self.index);
       let ret = self.value.loop_get(self.index);
       self.index += 1;
