@@ -83,15 +83,15 @@ where
     } else if idx == 0 {
       match self {
         Empty => None,
-        Tree(t) => t.ref_first(),
+        Tree(t) => Some(t.loop_first()),
       }
     } else if idx == l - 1 {
       match self {
         Empty => None,
-        Tree(t) => t.ref_last(),
+        Tree(t) => Some(t.loop_last()),
       }
     } else {
-      self.ref_get(idx)
+      self.loop_get(idx)
     }
   }
 
@@ -193,21 +193,23 @@ where
   }
   /// ternary tree operation of rest
   pub fn rest(&self) -> Result<Self, String> {
-    if self.is_empty() {
+    let size = self.len();
+    if size == 0 {
       Err(String::from("calling rest on empty"))
-    } else if self.len() == 1 {
+    } else if size == 1 {
       Ok(TernaryTreeList::Empty)
     } else {
       self.dissoc(0)
     }
   }
   pub fn butlast(&self) -> Result<Self, String> {
-    if self.is_empty() {
+    let size = self.len();
+    if size == 0 {
       Err(String::from("calling butlast on empty"))
-    } else if self.len() == 1 {
+    } else if size == 1 {
       Ok(TernaryTreeList::Empty)
     } else {
-      self.dissoc(self.len() - 1)
+      self.dissoc(size - 1)
     }
   }
 
@@ -450,7 +452,11 @@ where
   }
 
   pub fn iter(&self) -> TernaryTreeListRefIntoIterator<T> {
-    TernaryTreeListRefIntoIterator { value: self, index: 0 }
+    TernaryTreeListRefIntoIterator {
+      value: self,
+      index: 0,
+      size: self.len(),
+    }
   }
 }
 
@@ -475,13 +481,18 @@ where
   type IntoIter = TernaryTreeListRefIntoIterator<'a, T>;
 
   fn into_iter(self) -> Self::IntoIter {
-    TernaryTreeListRefIntoIterator { value: self, index: 0 }
+    TernaryTreeListRefIntoIterator {
+      value: self,
+      index: 0,
+      size: self.len(),
+    }
   }
 }
 
 pub struct TernaryTreeListRefIntoIterator<'a, T> {
   value: &'a TernaryTreeList<T>,
   index: usize,
+  size: usize,
 }
 
 impl<'a, T> Iterator for TernaryTreeListRefIntoIterator<'a, T>
@@ -490,9 +501,9 @@ where
 {
   type Item = &'a T;
   fn next(&mut self) -> Option<Self::Item> {
-    if self.index < self.value.len() {
+    if self.index < self.size {
       // println!("get: {} {}", self.value.format_inline(), self.index);
-      let ret = self.value.ref_get(self.index);
+      let ret = self.value.loop_get(self.index);
       self.index += 1;
       ret
     } else {
@@ -548,7 +559,7 @@ where
     } else {
       match self {
         Empty => panic!("list is empty to index"),
-        Tree(t) => t.ref_get(idx),
+        Tree(t) => t.loop_get(idx),
       }
     }
   }
