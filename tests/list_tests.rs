@@ -320,6 +320,27 @@ fn iterator() -> Result<(), String> {
 }
 
 #[test]
+fn traverse() -> Result<(), String> {
+  let origin4 = [1, 2, 3, 4];
+  let data4 = TernaryTreeList::from(&origin4);
+
+  let mut i = 0;
+  for _ in &data4 {
+    i += 1;
+  }
+
+  assert_eq!(i, 4);
+
+  i = 0;
+  for (idx, _) in data4.iter().enumerate() {
+    i += idx;
+    assert_eq!(data4.loop_get(idx).unwrap(), &origin4[idx]);
+  }
+
+  Ok(())
+}
+
+#[test]
 fn check_structure() -> Result<(), String> {
   let mut data = TernaryTreeList::from(&[]);
   for idx in 0..20 {

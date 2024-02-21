@@ -451,6 +451,14 @@ where
     }
   }
 
+  /// traverse all elements in list, use referenced value
+  pub fn traverse(&self, f: impl Fn(&T)) {
+    match self {
+      Empty => (),
+      Tree(t) => t.traverse(&f),
+    }
+  }
+
   pub fn iter(&self) -> TernaryTreeListRefIntoIterator<T> {
     TernaryTreeListRefIntoIterator {
       value: self,
