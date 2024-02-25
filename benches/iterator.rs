@@ -1,5 +1,3 @@
-use std::cell::RefCell;
-
 use criterion::{criterion_group, criterion_main, Criterion};
 
 use im_ternary_tree::TernaryTreeList;
@@ -24,11 +22,11 @@ fn criterion_benchmark(c: &mut Criterion) {
   });
 
   c.bench_function("traverse", |b| {
-    let cc = RefCell::new(0);
+    let mut cc = 0;
 
     b.iter(|| {
-      data.traverse(|item| {
-        *cc.borrow_mut() += item;
+      data.traverse(&mut |item| {
+        cc += item;
       });
     })
   });

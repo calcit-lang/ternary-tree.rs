@@ -1240,7 +1240,7 @@ where
     xs
   }
 
-  pub fn traverse(&self, f: &impl Fn(&T)) {
+  pub fn traverse(&self, f: &mut dyn FnMut(&T)) {
     match self {
       Leaf(value) => f(value),
       Branch2 { left, middle, .. } => {
@@ -1251,6 +1251,23 @@ where
         left.traverse(f);
         middle.traverse(f);
         right.traverse(f);
+      }
+    }
+  }
+
+  pub fn traverse_result<S>(&self, f: &mut dyn FnMut(&T) -> Result<(), S>) -> Result<(), S> {
+    match self {
+      Leaf(value) => f(value),
+      Branch2 { left, middle, .. } => {
+        left.traverse_result(f)?;
+        middle.traverse_result(f)?;
+        Ok(())
+      }
+      Branch3 { left, middle, right, .. } => {
+        left.traverse_result(f)?;
+        middle.traverse_result(f)?;
+        right.traverse_result(f)?;
+        Ok(())
       }
     }
   }
