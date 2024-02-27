@@ -451,6 +451,23 @@ where
     }
   }
 
+  /// traverse all elements in list, use referenced value
+  pub fn traverse(&self, f: &mut dyn FnMut(&T)) {
+    match self {
+      Empty => (),
+      Tree(t) => t.traverse(f),
+    }
+  }
+
+  /// traverse elements in list, use referenced value,
+  /// returns `Ok` when all elements are traversed
+  pub fn traverse_result<S>(&self, f: &mut dyn FnMut(&T) -> Result<(), S>) -> Result<(), S> {
+    match self {
+      Empty => Ok(()),
+      Tree(t) => t.traverse_result(f),
+    }
+  }
+
   pub fn iter(&self) -> TernaryTreeListRefIntoIterator<T> {
     TernaryTreeListRefIntoIterator {
       value: self,

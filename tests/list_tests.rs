@@ -320,6 +320,27 @@ fn iterator() -> Result<(), String> {
 }
 
 #[test]
+fn iter_enum() -> Result<(), String> {
+  let origin4 = [1, 2, 3, 4];
+  let data4 = TernaryTreeList::from(&origin4);
+
+  let mut i = 0;
+  for _ in &data4 {
+    i += 1;
+  }
+
+  assert_eq!(i, 4);
+
+  i = 0;
+  for (idx, _) in data4.iter().enumerate() {
+    i += idx;
+    assert_eq!(data4.loop_get(idx).unwrap(), &origin4[idx]);
+  }
+
+  Ok(())
+}
+
+#[test]
 fn check_structure() -> Result<(), String> {
   let mut data = TernaryTreeList::from(&[]);
   for idx in 0..20 {
@@ -459,6 +480,49 @@ fn split_values() -> Result<(), String> {
     assert_eq!(left, data.take(i)?);
     assert_eq!(right, data.skip(i)?);
   }
+
+  Ok(())
+}
+
+#[test]
+fn traverse() -> Result<(), String> {
+  let n = 100;
+  let mut data = TernaryTreeList::from(&[]);
+  let mut total = 0;
+  for idx in 0..n {
+    data = data.append(idx);
+    total += idx;
+  }
+
+  let mut c = 0;
+
+  data.traverse(&mut |x| {
+    c += x;
+  });
+
+  assert_eq!(c, total);
+
+  Ok(())
+}
+
+#[test]
+fn traverse_result() -> Result<(), String> {
+  let n = 100;
+  let mut data = TernaryTreeList::from(&[]);
+  let mut total = 0;
+  for idx in 0..n {
+    data = data.append(idx);
+    total += idx;
+  }
+
+  let mut c = 0;
+
+  data.traverse_result::<String>(&mut |x| {
+    c += x;
+    Ok(())
+  })?;
+
+  assert_eq!(c, total);
 
   Ok(())
 }

@@ -1240,8 +1240,40 @@ where
     xs
   }
 
-  pub fn iter(&self) -> TernaryTreeRefIntoIterator<T> {
-    TernaryTreeRefIntoIterator {
+  pub fn traverse(&self, f: &mut dyn FnMut(&T)) {
+    match self {
+      Leaf(value) => f(value),
+      Branch2 { left, middle, .. } => {
+        left.traverse(f);
+        middle.traverse(f);
+      }
+      Branch3 { left, middle, right, .. } => {
+        left.traverse(f);
+        middle.traverse(f);
+        right.traverse(f);
+      }
+    }
+  }
+
+  pub fn traverse_result<S>(&self, f: &mut dyn FnMut(&T) -> Result<(), S>) -> Result<(), S> {
+    match self {
+      Leaf(value) => f(value),
+      Branch2 { left, middle, .. } => {
+        left.traverse_result(f)?;
+        middle.traverse_result(f)?;
+        Ok(())
+      }
+      Branch3 { left, middle, right, .. } => {
+        left.traverse_result(f)?;
+        middle.traverse_result(f)?;
+        right.traverse_result(f)?;
+        Ok(())
+      }
+    }
+  }
+
+  pub fn iter(&self) -> TernaryTreeIterator<T> {
+    TernaryTreeIterator {
       value: self,
       index: 0,
       size: self.len(),
@@ -1268,10 +1300,10 @@ where
   T: Clone + Display + Eq + PartialEq + Debug + Ord + PartialOrd + Hash,
 {
   type Item = &'a T;
-  type IntoIter = TernaryTreeRefIntoIterator<'a, T>;
+  type IntoIter = TernaryTreeIterator<'a, T>;
 
   fn into_iter(self) -> Self::IntoIter {
-    TernaryTreeRefIntoIterator {
+    TernaryTreeIterator {
       value: self,
       index: 0,
       size: self.len(),
@@ -1279,13 +1311,13 @@ where
   }
 }
 
-pub struct TernaryTreeRefIntoIterator<'a, T> {
+pub struct TernaryTreeIterator<'a, T> {
   value: &'a TernaryTree<T>,
   index: usize,
   size: usize,
 }
 
-impl<'a, T> Iterator for TernaryTreeRefIntoIterator<'a, T>
+impl<'a, T> Iterator for TernaryTreeIterator<'a, T>
 where
   T: Clone + Display + Eq + PartialEq + Debug + Ord + PartialOrd + Hash,
 {
