@@ -2,7 +2,7 @@
 [package]
 name = "im_ternary_tree"
 version = "0.0.18"
-edition = "2021"
+edition = "2024"
 authors = ["jiyinyiyong <jiyinyiyong@gmail.com>"]
 license = "MIT"
 description = "Structural sharing ternary tree, i.e. immutable data structure"
