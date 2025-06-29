@@ -19,7 +19,7 @@ keywords = ["ternary", "tree", "structual-sharing", "immutable"]
 
 
 [dev-dependencies]
-criterion = "0.3"
+criterion = "0.6.0"
 
 
 [[bench]]

@@ -1,4 +1,4 @@
-## Persistent structrual sharing tree for Calcit
+## Persistent structural sharing tree for Calcit Runtime
 
 > a variant of 2-3 tree, with enhancements on ternary branching, optimized with tricks like finger-tree.
 
@@ -36,16 +36,16 @@ assert_eq!(updated.unsafe_get(3), 10);
 
 This library has special optimizations on `push_right` and `pop_left` with tricks from [finger-tree](https://en.wikipedia.org/wiki/Finger_tree).
 
-And as its size grows, it's always operating on a shallow branch at right end, wasting fewer nodes for indexing new elements, a random demo looks like:
+And as its size grows, it always operates on a shallow branch at right end, wasting fewer nodes for indexing new elements, a random demo looks like:
 
 ![ternary-tree illustrated](assets/partial.png)
 
-Also the left branches are kept shallow on purpose so it can be cheaper in `pop_left`. Totally inspired by finger-tree.
+Also the left branches are kept shallow on purpose so it can be cheaper in `pop_left`. This trick is inspired by finger-tree.
 
 ### Known Issues
 
-- no optimizations on `pop_right` and `push_left`.
-- elements in the middle could be inside deep branches, leading to slow performance.
+- lack of optimizations on `pop_right` and `push_left`.
+- elements in the middle may be deeply nested, resulting in slow performance.
 
 ### License
 
