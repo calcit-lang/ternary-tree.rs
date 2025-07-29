@@ -790,7 +790,7 @@ where
   }
   pub fn concat(raw: &[TernaryTree<T>]) -> Self {
     if raw.is_empty() {
-      unreachable!("does not work with empty list in ternary-tree");
+      unreachable!("concat requires at least one non-empty tree");
     }
     let mut ys: Vec<TernaryTree<T>> = Vec::with_capacity(raw.len());
     for x in raw {
