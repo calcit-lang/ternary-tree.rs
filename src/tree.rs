@@ -799,7 +799,7 @@ where
     Self::concat_layers(&mut ys)
   }
 
-  /// this was an old implementation of concat, it is not balanced and does not work with empty list
+  /// This was the old implementation of concat. It is not balanced and does not work with empty lists.
   pub fn concat_dumb(raw: &[TernaryTree<T>]) -> Self {
     let mut xs_groups: Vec<TernaryTree<T>> = Vec::with_capacity(raw.len());
     for x in raw {
