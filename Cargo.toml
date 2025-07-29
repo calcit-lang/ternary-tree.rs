@@ -40,5 +40,9 @@ harness = false
 name = "random_access"
 harness = false
 
+[[bench]]
+name = "concat"
+harness = false
+
 [profile.release]
 debug = true

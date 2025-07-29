@@ -789,6 +789,17 @@ where
     }
   }
   pub fn concat(raw: &[TernaryTree<T>]) -> Self {
+    if raw.is_empty() {
+      unreachable!("does not work with empty list in ternary-tree");
+    }
+    let mut ys: Vec<TernaryTree<T>> = Vec::with_capacity(raw.len());
+    for x in raw {
+      ys.push(x.to_owned())
+    }
+    Self::concat_layers(&mut ys)
+  }
+
+  pub fn concat_dumb(raw: &[TernaryTree<T>]) -> Self {
     let mut xs_groups: Vec<TernaryTree<T>> = Vec::with_capacity(raw.len());
     for x in raw {
       xs_groups.push(x.to_owned());
@@ -825,6 +836,47 @@ where
       }
     }
   }
+
+  /// a balanced way of building tree from a list of trees
+  pub fn concat_layers(raw: &mut Vec<TernaryTree<T>>) -> Self {
+    if raw.is_empty() {
+      unreachable!("does not work with empty list in ternary-tree");
+    }
+
+    while raw.len() > 1 {
+      let mut next_layer = Vec::with_capacity((raw.len() + 2) / 3);
+      let mut i = 0;
+      while i < raw.len() {
+        if i + 2 < raw.len() {
+          let left = raw[i].to_owned();
+          let middle = raw[i + 1].to_owned();
+          let right = raw[i + 2].to_owned();
+          next_layer.push(Branch3 {
+            size: left.len() + middle.len() + right.len(),
+            left: Arc::new(left),
+            middle: Arc::new(middle),
+            right: Arc::new(right),
+          });
+          i += 3;
+        } else if i + 1 < raw.len() {
+          let left = raw[i].to_owned();
+          let middle = raw[i + 1].to_owned();
+          next_layer.push(Branch2 {
+            size: left.len() + middle.len(),
+            left: Arc::new(left),
+            middle: Arc::new(middle),
+          });
+          i += 2;
+        } else {
+          next_layer.push(raw[i].to_owned());
+          i += 1;
+        }
+      }
+      *raw = next_layer;
+    }
+    raw[0].to_owned()
+  }
+
   pub fn check_structure(&self) -> Result<(), String> {
     match self {
       Leaf { .. } => Ok(()),

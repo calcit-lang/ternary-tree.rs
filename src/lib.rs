@@ -372,6 +372,20 @@ where
       TernaryTreeList::Tree(TernaryTree::concat(&trees))
     }
   }
+  pub fn concat_dumb(raw: &[TernaryTreeList<T>]) -> Self {
+    let mut trees: Vec<TernaryTree<T>> = vec![];
+    for x in raw {
+      match x {
+        Empty => (),
+        Tree(t) => trees.push(t.clone()),
+      }
+    }
+    if trees.is_empty() {
+      TernaryTreeList::Empty
+    } else {
+      TernaryTreeList::Tree(TernaryTree::concat_dumb(&trees))
+    }
+  }
   pub fn check_structure(&self) -> Result<(), String> {
     match self {
       Empty => Ok(()),

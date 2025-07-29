@@ -243,7 +243,7 @@ fn test_concat() -> Result<(), String> {
   );
   assert_eq!(
     TernaryTreeList::concat(&[data1.to_owned(), data2.to_owned(), data3.to_owned(), data4.to_owned()]).format_inline(),
-    "((1 2) ((3 4) (5 6)) (7 8))"
+    "(((1 2) (3 4) (5 6)) (7 8))"
   );
 
   TernaryTreeList::concat(&[data1.to_owned(), data2.to_owned()]).check_structure()?;
