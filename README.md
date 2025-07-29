@@ -42,9 +42,30 @@ And as its size grows, it always operates on a shallow branch at right end, wast
 
 Also the left branches are kept shallow on purpose so it can be cheaper in `pop_left`. This trick is inspired by finger-tree.
 
+### Performance
+
+Benchmarks comparing `TernaryTreeList` with `std::vec::Vec` and `std::collections::VecDeque` show a clear performance profile. As an immutable data structure, `TernaryTreeList` has some overhead compared to its mutable counterparts, but offers significant advantages in specific scenarios.
+
+- **`push_right` / `drop_right` (Appending/Popping from the tail):**
+  - `Vec` and `VecDeque` are significantly faster, as they are mutable and optimized for O(1) amortized operations at the tail.
+  - `TernaryTreeList` is slower due to the nature of immutable structures, which require creating new tree nodes.
+
+- **`push_left` / `drop_left` (Prepending/Popping from the head):**
+  - `TernaryTreeList` is **dramatically faster than `Vec`**. `Vec::insert(0, ...)` is an O(n) operation, while `TernaryTreeList`'s finger-tree-inspired optimizations make head operations much more efficient.
+  - `VecDeque` is still the fastest, as it is a mutable data structure specifically designed for O(1) head and tail operations.
+
+**Conclusion:**
+
+- **Use `TernaryTreeList` when:**
+  - You need an **immutable** (persistent) list.
+  - You require **efficient push and pop operations on both ends** of the list.
+- **Use `Vec` or `VecDeque` when:**
+  - Mutability is acceptable.
+  - You need the absolute best performance for purely mutable operations.
+
 ### Known Issues
 
-- lack of optimizations on `pop_right` and `push_left`.
+- lack of optimizations on `pop_right`.
 - elements in the middle may be deeply nested, resulting in slow performance.
 
 ### License

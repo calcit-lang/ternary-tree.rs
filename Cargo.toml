@@ -20,10 +20,24 @@ keywords = ["ternary", "tree", "structual-sharing", "immutable"]
 
 [dev-dependencies]
 criterion = "0.6.0"
+proptest = "1.5.0"
+fastrand = "2.1.0"
 
 
 [[bench]]
 name = "iterator"
+harness = false
+
+[[bench]]
+name = "push_pop"
+harness = false
+
+[[bench]]
+name = "accessing"
+harness = false
+
+[[bench]]
+name = "random_access"
 harness = false
 
 [profile.release]
