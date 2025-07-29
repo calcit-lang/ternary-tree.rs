@@ -357,7 +357,7 @@ where
         if idx == 0 {
           Ok(Leaf(item))
         } else {
-          Err(format!("Cannot assoc leaf into index {}", idx))
+          Err(format!("Cannot assoc leaf into index {idx}"))
         }
       }
       Branch2 { left, middle, size, .. } => {
@@ -599,7 +599,7 @@ where
           });
         }
 
-        if idx == 0 && right.len() == 0 && middle.len() >= right.len() {
+        if idx == 0 && right.is_empty() && middle.len() >= right.len() {
           return Ok(Branch3 {
             size: *size + 1,
             left: Arc::new(Leaf(item)),
@@ -726,7 +726,7 @@ where
           });
         }
 
-        if idx == *size - 1 && right.len() == 0 && middle.len() >= left.len() {
+        if idx == *size - 1 && right.is_empty() && middle.len() >= left.len() {
           return Ok(Branch3 {
             size: *size + 1,
             left: left.to_owned(),
@@ -799,6 +799,7 @@ where
     Self::concat_layers(&mut ys)
   }
 
+  /// this was an old implementation of concat, it is not balanced and does not work with empty list
   pub fn concat_dumb(raw: &[TernaryTree<T>]) -> Self {
     let mut xs_groups: Vec<TernaryTree<T>> = Vec::with_capacity(raw.len());
     for x in raw {
@@ -844,7 +845,7 @@ where
     }
 
     while raw.len() > 1 {
-      let mut next_layer = Vec::with_capacity((raw.len() + 2) / 3);
+      let mut next_layer = Vec::with_capacity(raw.len().div_ceil(3));
       let mut i = 0;
       while i < raw.len() {
         if i + 2 < raw.len() {
@@ -914,7 +915,7 @@ where
         if end_idx == 1 {
           Ok(self.to_owned())
         } else {
-          Err(format!("Invalid take_left for a leaf: {}", end_idx))
+          Err(format!("Invalid take_left for a leaf: {end_idx}"))
         }
       }
 
@@ -972,7 +973,7 @@ where
         if start_idx == 0 {
           Ok(self.to_owned())
         } else {
-          Err(format!("Invalid take_right range for a leaf: {}", start_idx,))
+          Err(format!("Invalid take_right range for a leaf: {start_idx}",))
         }
       }
 
@@ -1031,7 +1032,7 @@ where
         if start_idx == 0 && end_idx == 1 {
           Ok(self.to_owned())
         } else {
-          Err(format!("Invalid slice range for a leaf: {} {}", start_idx, end_idx))
+          Err(format!("Invalid slice range for a leaf: {start_idx} {end_idx}"))
         }
       }
 
@@ -1340,7 +1341,7 @@ where
   fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
     write!(f, "(TernaryTree")?;
     for item in self.into_iter() {
-      write!(f, " {}", item)?;
+      write!(f, " {item}")?;
     }
     write!(f, ")")
   }
