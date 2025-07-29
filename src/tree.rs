@@ -838,7 +838,7 @@ where
     }
   }
 
-  /// a balanced way of building tree from a list of trees
+  /// a balanced way of building a tree from a list of trees
   pub fn concat_layers(raw: &mut Vec<TernaryTree<T>>) -> Self {
     if raw.is_empty() {
       unreachable!("concat_layers requires at least one tree and cannot process an empty list");
