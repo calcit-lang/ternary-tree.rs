@@ -66,7 +66,7 @@ where
   pub fn format_debug(&self) -> String {
     let mut s = String::from("(TernaryTreeList debug");
     for x in self.iter() {
-      s.push_str(&format!(" {:?}", x));
+      s.push_str(&format!(" {x:?}"));
     }
     s.push(')');
     s
@@ -372,6 +372,20 @@ where
       TernaryTreeList::Tree(TernaryTree::concat(&trees))
     }
   }
+  pub fn concat_dumb(raw: &[TernaryTreeList<T>]) -> Self {
+    let mut trees: Vec<TernaryTree<T>> = vec![];
+    for x in raw {
+      match x {
+        Empty => (),
+        Tree(t) => trees.push(t.clone()),
+      }
+    }
+    if trees.is_empty() {
+      TernaryTreeList::Empty
+    } else {
+      TernaryTreeList::Tree(TernaryTree::concat_dumb(&trees))
+    }
+  }
   pub fn check_structure(&self) -> Result<(), String> {
     match self {
       Empty => Ok(()),
@@ -391,7 +405,7 @@ where
           return Err(format!("Slice range too large {} for {}", end_idx, self.format_inline()));
         }
         if start_idx > end_idx {
-          return Err(format!("Invalid slice range {}..{} for {}", start_idx, end_idx, self));
+          return Err(format!("Invalid slice range {start_idx}..{end_idx} for {self}"));
         }
         if start_idx == end_idx {
           return Ok(TernaryTreeList::Empty);
@@ -484,7 +498,7 @@ where
   fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
     match self {
       Empty => write!(f, "Empty"),
-      Tree(t) => write!(f, "{}", t),
+      Tree(t) => write!(f, "{t}"),
     }
   }
 }

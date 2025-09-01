@@ -357,7 +357,7 @@ where
         if idx == 0 {
           Ok(Leaf(item))
         } else {
-          Err(format!("Cannot assoc leaf into index {}", idx))
+          Err(format!("Cannot assoc leaf into index {idx}"))
         }
       }
       Branch2 { left, middle, size, .. } => {
@@ -599,7 +599,7 @@ where
           });
         }
 
-        if idx == 0 && right.len() == 0 && middle.len() >= right.len() {
+        if idx == 0 && right.is_empty() && middle.len() >= right.len() {
           return Ok(Branch3 {
             size: *size + 1,
             left: Arc::new(Leaf(item)),
@@ -726,7 +726,7 @@ where
           });
         }
 
-        if idx == *size - 1 && right.len() == 0 && middle.len() >= left.len() {
+        if idx == *size - 1 && right.is_empty() && middle.len() >= left.len() {
           return Ok(Branch3 {
             size: *size + 1,
             left: left.to_owned(),
@@ -789,6 +789,18 @@ where
     }
   }
   pub fn concat(raw: &[TernaryTree<T>]) -> Self {
+    if raw.is_empty() {
+      unreachable!("concat requires at least one non-empty tree");
+    }
+    let mut ys: Vec<TernaryTree<T>> = Vec::with_capacity(raw.len());
+    for x in raw {
+      ys.push(x.to_owned())
+    }
+    Self::concat_layers(&mut ys)
+  }
+
+  /// This was the old implementation of concat. It is not balanced and does not work with empty lists.
+  pub fn concat_dumb(raw: &[TernaryTree<T>]) -> Self {
     let mut xs_groups: Vec<TernaryTree<T>> = Vec::with_capacity(raw.len());
     for x in raw {
       xs_groups.push(x.to_owned());
@@ -825,6 +837,47 @@ where
       }
     }
   }
+
+  /// a balanced way of building a tree from a list of trees
+  pub fn concat_layers(raw: &mut Vec<TernaryTree<T>>) -> Self {
+    if raw.is_empty() {
+      unreachable!("concat_layers requires at least one tree and cannot process an empty list");
+    }
+
+    while raw.len() > 1 {
+      let mut next_layer = Vec::with_capacity(raw.len().div_ceil(3));
+      let mut i = 0;
+      while i < raw.len() {
+        if i + 2 < raw.len() {
+          let left = raw[i].to_owned();
+          let middle = raw[i + 1].to_owned();
+          let right = raw[i + 2].to_owned();
+          next_layer.push(Branch3 {
+            size: left.len() + middle.len() + right.len(),
+            left: Arc::new(left),
+            middle: Arc::new(middle),
+            right: Arc::new(right),
+          });
+          i += 3;
+        } else if i + 1 < raw.len() {
+          let left = raw[i].to_owned();
+          let middle = raw[i + 1].to_owned();
+          next_layer.push(Branch2 {
+            size: left.len() + middle.len(),
+            left: Arc::new(left),
+            middle: Arc::new(middle),
+          });
+          i += 2;
+        } else {
+          next_layer.push(raw[i].to_owned());
+          i += 1;
+        }
+      }
+      *raw = next_layer;
+    }
+    raw[0].to_owned()
+  }
+
   pub fn check_structure(&self) -> Result<(), String> {
     match self {
       Leaf { .. } => Ok(()),
@@ -862,7 +915,7 @@ where
         if end_idx == 1 {
           Ok(self.to_owned())
         } else {
-          Err(format!("Invalid take_left for a leaf: {}", end_idx))
+          Err(format!("Invalid take_left for a leaf: {end_idx}"))
         }
       }
 
@@ -920,7 +973,7 @@ where
         if start_idx == 0 {
           Ok(self.to_owned())
         } else {
-          Err(format!("Invalid take_right range for a leaf: {}", start_idx,))
+          Err(format!("Invalid take_right range for a leaf: {start_idx}",))
         }
       }
 
@@ -979,7 +1032,7 @@ where
         if start_idx == 0 && end_idx == 1 {
           Ok(self.to_owned())
         } else {
-          Err(format!("Invalid slice range for a leaf: {} {}", start_idx, end_idx))
+          Err(format!("Invalid slice range for a leaf: {start_idx} {end_idx}"))
         }
       }
 
@@ -1288,7 +1341,7 @@ where
   fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
     write!(f, "(TernaryTree")?;
     for item in self.into_iter() {
-      write!(f, " {}", item)?;
+      write!(f, " {item}")?;
     }
     write!(f, ")")
   }
