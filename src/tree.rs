@@ -1327,9 +1327,7 @@ where
 
   pub fn iter(&self) -> TernaryTreeIterator<T> {
     TernaryTreeIterator {
-      value: self,
-      index: 0,
-      size: self.len(),
+      stack: vec![(self, 0)],
     }
   }
 }
@@ -1357,17 +1355,13 @@ where
 
   fn into_iter(self) -> Self::IntoIter {
     TernaryTreeIterator {
-      value: self,
-      index: 0,
-      size: self.len(),
+      stack: vec![(self, 0)],
     }
   }
 }
 
 pub struct TernaryTreeIterator<'a, T> {
-  value: &'a TernaryTree<T>,
-  index: usize,
-  size: usize,
+  stack: Vec<(&'a TernaryTree<T>, u8)>,
 }
 
 impl<'a, T> Iterator for TernaryTreeIterator<'a, T>
@@ -1376,14 +1370,31 @@ where
 {
   type Item = &'a T;
   fn next(&mut self) -> Option<Self::Item> {
-    if self.index < self.size {
-      // println!("get: {} {}", self.value.format_inline(), self.index);
-      let ret = self.value.loop_get(self.index);
-      self.index += 1;
-      Some(ret)
-    } else {
-      None
+    while let Some((node, stage)) = self.stack.pop() {
+      match node {
+        Leaf(value) => return Some(value),
+        Branch2 { left, middle, .. } => {
+          if stage == 0 {
+            self.stack.push((node, 1));
+            self.stack.push((left, 0));
+          } else {
+            self.stack.push((middle, 0));
+          }
+        }
+        Branch3 { left, middle, right, .. } => {
+          if stage == 0 {
+            self.stack.push((node, 1));
+            self.stack.push((left, 0));
+          } else if stage == 1 {
+            self.stack.push((node, 2));
+            self.stack.push((middle, 0));
+          } else {
+            self.stack.push((right, 0));
+          }
+        }
+      }
     }
+    None
   }
 }
 
