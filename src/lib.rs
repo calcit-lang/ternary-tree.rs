@@ -485,9 +485,7 @@ where
   pub fn iter(&self) -> TernaryTreeListRefIntoIterator<T> {
     match self {
       Empty => TernaryTreeListRefIntoIterator { tree_iter: None },
-      Tree(t) => TernaryTreeListRefIntoIterator {
-        tree_iter: Some(t.iter()),
-      },
+      Tree(t) => TernaryTreeListRefIntoIterator { tree_iter: Some(t.iter()) },
     }
   }
 }
@@ -515,9 +513,7 @@ where
   fn into_iter(self) -> Self::IntoIter {
     match self {
       Empty => TernaryTreeListRefIntoIterator { tree_iter: None },
-      Tree(t) => TernaryTreeListRefIntoIterator {
-        tree_iter: Some(t.iter()),
-      },
+      Tree(t) => TernaryTreeListRefIntoIterator { tree_iter: Some(t.iter()) },
     }
   }
 }

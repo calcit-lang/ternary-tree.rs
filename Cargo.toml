@@ -44,5 +44,9 @@ harness = false
 name = "concat"
 harness = false
 
+[[bench]]
+name = "searching"
+harness = false
+
 [profile.release]
 debug = true
