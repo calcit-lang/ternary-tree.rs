@@ -47,23 +47,23 @@ cargo bench --bench searching -- --noplot --baseline optimized_v1
 
 ## 4) Result Table
 
-| Benchmark | Baseline time | Candidate time | Change | Status | Notes |
-|---|---:|---:|---:|---|---|
-| iter |  |  |  |  |  |
-| traverse |  |  |  |  |  |
-| index |  |  |  |  |  |
-| get |  |  |  |  |  |
-| loop_get |  |  |  |  |  |
-| ref_get |  |  |  |  |  |
-| first |  |  |  |  |  |
-| index_of_hit/tree |  |  |  |  |  |
-| index_of_hit/vec |  |  |  |  |  |
-| last_index_of_hit/tree |  |  |  |  |  |
-| last_index_of_hit/vec |  |  |  |  |  |
-| index_of_miss/tree |  |  |  |  |  |
-| last_index_of_miss/tree |  |  |  |  |  |
-| find_index_hit/tree |  |  |  |  |  |
-| find_index_miss/tree |  |  |  |  |  |
+| Benchmark               | Baseline time | Candidate time | Change | Status | Notes |
+| ----------------------- | ------------: | -------------: | -----: | ------ | ----- |
+| iter                    |               |                |        |        |       |
+| traverse                |               |                |        |        |       |
+| index                   |               |                |        |        |       |
+| get                     |               |                |        |        |       |
+| loop_get                |               |                |        |        |       |
+| ref_get                 |               |                |        |        |       |
+| first                   |               |                |        |        |       |
+| index_of_hit/tree       |               |                |        |        |       |
+| index_of_hit/vec        |               |                |        |        |       |
+| last_index_of_hit/tree  |               |                |        |        |       |
+| last_index_of_hit/vec   |               |                |        |        |       |
+| index_of_miss/tree      |               |                |        |        |       |
+| last_index_of_miss/tree |               |                |        |        |       |
+| find_index_hit/tree     |               |                |        |        |       |
+| find_index_miss/tree    |               |                |        |        |       |
 
 ---
 

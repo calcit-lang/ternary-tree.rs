@@ -13,14 +13,14 @@ fn concat_benchmark(c: &mut Criterion) {
     .collect::<Vec<_>>();
 
   group.bench_with_input(
-    BenchmarkId::new("Balanced (New)", format!("{}x{}", list_count_balanced, list_size_balanced)),
+    BenchmarkId::new("Balanced (New)", format!("{list_count_balanced}x{list_size_balanced}")),
     &balanced_lists,
     |b, lists| {
       b.iter(|| TernaryTreeList::concat(black_box(lists)));
     },
   );
   group.bench_with_input(
-    BenchmarkId::new("Balanced (Dumb)", format!("{}x{}", list_count_balanced, list_size_balanced)),
+    BenchmarkId::new("Balanced (Dumb)", format!("{list_count_balanced}x{list_size_balanced}")),
     &balanced_lists,
     |b, lists| {
       b.iter(|| TernaryTreeList::concat_dumb(black_box(lists)));
@@ -35,14 +35,14 @@ fn concat_benchmark(c: &mut Criterion) {
     .collect::<Vec<_>>();
 
   group.bench_with_input(
-    BenchmarkId::new("ManyShallow (New)", format!("{}x{}", list_count_shallow, list_size_shallow)),
+    BenchmarkId::new("ManyShallow (New)", format!("{list_count_shallow}x{list_size_shallow}")),
     &shallow_lists,
     |b, lists| {
       b.iter(|| TernaryTreeList::concat(black_box(lists)));
     },
   );
   group.bench_with_input(
-    BenchmarkId::new("ManyShallow (Dumb)", format!("{}x{}", list_count_shallow, list_size_shallow)),
+    BenchmarkId::new("ManyShallow (Dumb)", format!("{list_count_shallow}x{list_size_shallow}")),
     &shallow_lists,
     |b, lists| {
       b.iter(|| TernaryTreeList::concat_dumb(black_box(lists)));
@@ -57,14 +57,14 @@ fn concat_benchmark(c: &mut Criterion) {
     .collect::<Vec<_>>();
 
   group.bench_with_input(
-    BenchmarkId::new("FewDeep (New)", format!("{}x{}", list_count_deep, list_size_deep)),
+    BenchmarkId::new("FewDeep (New)", format!("{list_count_deep}x{list_size_deep}")),
     &deep_lists,
     |b, lists| {
       b.iter(|| TernaryTreeList::concat(black_box(lists)));
     },
   );
   group.bench_with_input(
-    BenchmarkId::new("FewDeep (Dumb)", format!("{}x{}", list_count_deep, list_size_deep)),
+    BenchmarkId::new("FewDeep (Dumb)", format!("{list_count_deep}x{list_size_deep}")),
     &deep_lists,
     |b, lists| {
       b.iter(|| TernaryTreeList::concat_dumb(black_box(lists)));
