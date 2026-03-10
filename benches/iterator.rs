@@ -1,4 +1,5 @@
 use criterion::{Criterion, criterion_group, criterion_main};
+use std::hint::black_box;
 
 use im_ternary_tree::TernaryTreeList;
 
@@ -18,6 +19,7 @@ fn criterion_benchmark(c: &mut Criterion) {
       for item in &data {
         cc += item;
       }
+      black_box(cc);
     })
   });
 
@@ -28,6 +30,7 @@ fn criterion_benchmark(c: &mut Criterion) {
       data.traverse(&mut |item| {
         cc += item;
       });
+      black_box(cc);
     })
   });
 }

@@ -1,7 +1,7 @@
 
 [package]
 name = "im_ternary_tree"
-version = "0.0.19"
+version = "0.0.20"
 edition = "2024"
 authors = ["jiyinyiyong <jiyinyiyong@gmail.com>"]
 license = "MIT"
@@ -42,6 +42,10 @@ harness = false
 
 [[bench]]
 name = "concat"
+harness = false
+
+[[bench]]
+name = "searching"
 harness = false
 
 [profile.release]

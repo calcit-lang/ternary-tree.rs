@@ -139,65 +139,80 @@ where
   }
 
   pub fn find_index(&self, f: Arc<dyn Fn(&T) -> bool>) -> Option<i64> {
-    match self {
-      Leaf(value) => {
-        if f(value) {
-          Some(0)
-        } else {
-          None
+    self.find_index_by(&*f)
+  }
+
+  fn find_index_by<F>(&self, f: &F) -> Option<i64>
+  where
+    F: Fn(&T) -> bool + ?Sized,
+  {
+    let mut stack: Vec<(&TernaryTree<T>, i64)> = vec![(self, 0)];
+    while let Some((node, base)) = stack.pop() {
+      match node {
+        Leaf(value) => {
+          if f(value) {
+            return Some(base);
+          }
+        }
+        Branch2 { left, middle, .. } => {
+          stack.push((middle, base + left.len() as i64));
+          stack.push((left, base));
+        }
+        Branch3 { left, middle, right, .. } => {
+          stack.push((right, base + left.len() as i64 + middle.len() as i64));
+          stack.push((middle, base + left.len() as i64));
+          stack.push((left, base));
         }
       }
-
-      Branch2 { left, middle, .. } => left
-        .find_index(f.to_owned())
-        .or_else(|| middle.find_index(f.to_owned()).map(|pos| pos + left.len() as i64)),
-
-      Branch3 { left, middle, right, .. } => left
-        .find_index(f.to_owned())
-        .or_else(|| middle.find_index(f.to_owned()).map(|pos| pos + left.len() as i64))
-        .or_else(|| {
-          right
-            .find_index(f.to_owned())
-            .map(|pos| pos + left.len() as i64 + middle.len() as i64)
-        }),
     }
+    None
   }
 
   pub fn index_of(&self, item: &T) -> Option<usize> {
-    match self {
-      Leaf(value) => {
-        if item == value {
-          Some(0)
-        } else {
-          None
+    let mut stack: Vec<(&TernaryTree<T>, usize)> = vec![(self, 0)];
+    while let Some((node, base)) = stack.pop() {
+      match node {
+        Leaf(value) => {
+          if item == value {
+            return Some(base);
+          }
+        }
+        Branch2 { left, middle, .. } => {
+          stack.push((middle, base + left.len()));
+          stack.push((left, base));
+        }
+        Branch3 { left, middle, right, .. } => {
+          stack.push((right, base + left.len() + middle.len()));
+          stack.push((middle, base + left.len()));
+          stack.push((left, base));
         }
       }
-      Branch2 { left, middle, .. } => left.index_of(item).or_else(|| middle.index_of(item).map(|pos| pos + left.len())),
-      Branch3 { left, middle, right, .. } => left
-        .index_of(item)
-        .or_else(|| middle.index_of(item).map(|pos| pos + left.len()))
-        .or_else(|| right.index_of(item).map(|pos| pos + left.len() + middle.len())),
     }
+    None
   }
 
   // index from end, returns 0 when item found at end of original list
   pub fn last_index_of(&self, item: &T) -> Option<usize> {
-    match self {
-      Leaf(value) => {
-        if item == value {
-          Some(0)
-        } else {
-          None
+    let mut stack: Vec<(&TernaryTree<T>, usize)> = vec![(self, 0)];
+    while let Some((node, base)) = stack.pop() {
+      match node {
+        Leaf(value) => {
+          if item == value {
+            return Some(base);
+          }
+        }
+        Branch2 { left, middle, .. } => {
+          stack.push((left, base + middle.len()));
+          stack.push((middle, base));
+        }
+        Branch3 { left, middle, right, .. } => {
+          stack.push((left, base + middle.len() + right.len()));
+          stack.push((middle, base + right.len()));
+          stack.push((right, base));
         }
       }
-      Branch2 { left, middle, .. } => middle
-        .last_index_of(item)
-        .or_else(|| left.last_index_of(item).map(|pos| pos + middle.len())),
-      Branch3 { left, middle, right, .. } => right
-        .last_index_of(item)
-        .or_else(|| middle.last_index_of(item).map(|pos| pos + right.len()))
-        .or_else(|| left.last_index_of(item).map(|pos| pos + middle.len() + right.len())),
     }
+    None
   }
 
   /// recursively check structure
@@ -846,36 +861,30 @@ where
 
     while raw.len() > 1 {
       let mut next_layer = Vec::with_capacity(raw.len().div_ceil(3));
-      let mut i = 0;
-      while i < raw.len() {
-        if i + 2 < raw.len() {
-          let left = raw[i].to_owned();
-          let middle = raw[i + 1].to_owned();
-          let right = raw[i + 2].to_owned();
-          next_layer.push(Branch3 {
-            size: left.len() + middle.len() + right.len(),
-            left: Arc::new(left),
-            middle: Arc::new(middle),
-            right: Arc::new(right),
-          });
-          i += 3;
-        } else if i + 1 < raw.len() {
-          let left = raw[i].to_owned();
-          let middle = raw[i + 1].to_owned();
-          next_layer.push(Branch2 {
-            size: left.len() + middle.len(),
-            left: Arc::new(left),
-            middle: Arc::new(middle),
-          });
-          i += 2;
+      let mut iter = std::mem::take(raw).into_iter();
+      while let Some(left) = iter.next() {
+        if let Some(middle) = iter.next() {
+          if let Some(right) = iter.next() {
+            next_layer.push(Branch3 {
+              size: left.len() + middle.len() + right.len(),
+              left: Arc::new(left),
+              middle: Arc::new(middle),
+              right: Arc::new(right),
+            });
+          } else {
+            next_layer.push(Branch2 {
+              size: left.len() + middle.len(),
+              left: Arc::new(left),
+              middle: Arc::new(middle),
+            });
+          }
         } else {
-          next_layer.push(raw[i].to_owned());
-          i += 1;
+          next_layer.push(left);
         }
       }
       *raw = next_layer;
     }
-    raw[0].to_owned()
+    raw.pop().expect("concat_layers should leave one root node")
   }
 
   pub fn check_structure(&self) -> Result<(), String> {
@@ -1326,11 +1335,7 @@ where
   }
 
   pub fn iter(&self) -> TernaryTreeIterator<T> {
-    TernaryTreeIterator {
-      value: self,
-      index: 0,
-      size: self.len(),
-    }
+    TernaryTreeIterator { stack: vec![(self, 0)] }
   }
 }
 
@@ -1356,18 +1361,12 @@ where
   type IntoIter = TernaryTreeIterator<'a, T>;
 
   fn into_iter(self) -> Self::IntoIter {
-    TernaryTreeIterator {
-      value: self,
-      index: 0,
-      size: self.len(),
-    }
+    TernaryTreeIterator { stack: vec![(self, 0)] }
   }
 }
 
 pub struct TernaryTreeIterator<'a, T> {
-  value: &'a TernaryTree<T>,
-  index: usize,
-  size: usize,
+  stack: Vec<(&'a TernaryTree<T>, u8)>,
 }
 
 impl<'a, T> Iterator for TernaryTreeIterator<'a, T>
@@ -1376,14 +1375,31 @@ where
 {
   type Item = &'a T;
   fn next(&mut self) -> Option<Self::Item> {
-    if self.index < self.size {
-      // println!("get: {} {}", self.value.format_inline(), self.index);
-      let ret = self.value.loop_get(self.index);
-      self.index += 1;
-      Some(ret)
-    } else {
-      None
+    while let Some((node, stage)) = self.stack.pop() {
+      match node {
+        Leaf(value) => return Some(value),
+        Branch2 { left, middle, .. } => {
+          if stage == 0 {
+            self.stack.push((node, 1));
+            self.stack.push((left, 0));
+          } else {
+            self.stack.push((middle, 0));
+          }
+        }
+        Branch3 { left, middle, right, .. } => {
+          if stage == 0 {
+            self.stack.push((node, 1));
+            self.stack.push((left, 0));
+          } else if stage == 1 {
+            self.stack.push((node, 2));
+            self.stack.push((middle, 0));
+          } else {
+            self.stack.push((right, 0));
+          }
+        }
+      }
     }
+    None
   }
 }
 
@@ -1393,8 +1409,8 @@ impl<T: Clone + Display + Eq + PartialEq + Debug + Ord + PartialOrd + Hash> Part
       return false;
     }
 
-    for idx in 0..ys.len() {
-      if self.loop_get(idx) != ys.loop_get(idx) {
+    for (left, right) in self.iter().zip(ys.iter()) {
+      if left != right {
         return false;
       }
     }
@@ -1420,8 +1436,8 @@ where
 {
   fn cmp(&self, other: &Self) -> Ordering {
     if self.len() == other.len() {
-      for idx in 0..self.len() {
-        match self.loop_get(idx).cmp(other.loop_get(idx)) {
+      for (left, right) in self.iter().zip(other.iter()) {
+        match left.cmp(right) {
           Ordering::Equal => {}
           a => return a,
         }

@@ -483,10 +483,9 @@ where
   }
 
   pub fn iter(&self) -> TernaryTreeListRefIntoIterator<T> {
-    TernaryTreeListRefIntoIterator {
-      value: self,
-      index: 0,
-      size: self.len(),
+    match self {
+      Empty => TernaryTreeListRefIntoIterator { tree_iter: None },
+      Tree(t) => TernaryTreeListRefIntoIterator { tree_iter: Some(t.iter()) },
     }
   }
 }
@@ -512,18 +511,15 @@ where
   type IntoIter = TernaryTreeListRefIntoIterator<'a, T>;
 
   fn into_iter(self) -> Self::IntoIter {
-    TernaryTreeListRefIntoIterator {
-      value: self,
-      index: 0,
-      size: self.len(),
+    match self {
+      Empty => TernaryTreeListRefIntoIterator { tree_iter: None },
+      Tree(t) => TernaryTreeListRefIntoIterator { tree_iter: Some(t.iter()) },
     }
   }
 }
 
 pub struct TernaryTreeListRefIntoIterator<'a, T> {
-  value: &'a TernaryTreeList<T>,
-  index: usize,
-  size: usize,
+  tree_iter: Option<tree::TernaryTreeIterator<'a, T>>,
 }
 
 impl<'a, T> Iterator for TernaryTreeListRefIntoIterator<'a, T>
@@ -532,13 +528,9 @@ where
 {
   type Item = &'a T;
   fn next(&mut self) -> Option<Self::Item> {
-    if self.index < self.size {
-      // println!("get: {} {}", self.value.format_inline(), self.index);
-      let ret = self.value.loop_get(self.index);
-      self.index += 1;
-      ret
-    } else {
-      None
+    match &mut self.tree_iter {
+      Some(it) => it.next(),
+      None => None,
     }
   }
 }
