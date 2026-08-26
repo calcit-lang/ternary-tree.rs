@@ -44,6 +44,8 @@ The left branches are also intentionally kept shallow, which reduces the cost of
 
 ### Performance
 
+See the reproducible [strategy optimization and immutable data structure comparison](docs/performance-optimization-2026-08-26.md) for before/after Criterion results and comparisons with `rpds::VectorSync` and `rpds::ListSync`.
+
 Benchmarks comparing `TernaryTreeList` with `std::vec::Vec` and `std::collections::VecDeque` show a clear performance profile. As an immutable data structure, `TernaryTreeList` has some overhead compared to its mutable counterparts but offers significant advantages in specific scenarios.
 
 - **`push_right` / `drop_right` (Appending/Popping from the tail):**

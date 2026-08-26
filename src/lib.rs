@@ -25,7 +25,7 @@ use std::hash::{Hash, Hasher};
 use std::ops::Index;
 use std::sync::Arc;
 
-use tree::TernaryTree::{self, *};
+use tree::TernaryTree;
 
 /// wraps TerarnaryTreeList with support for empty
 #[derive(Clone, Debug)]
@@ -482,7 +482,7 @@ where
     }
   }
 
-  pub fn iter(&self) -> TernaryTreeListRefIntoIterator<T> {
+  pub fn iter(&self) -> TernaryTreeListRefIntoIterator<'_, T> {
     match self {
       Empty => TernaryTreeListRefIntoIterator { tree_iter: None },
       Tree(t) => TernaryTreeListRefIntoIterator { tree_iter: Some(t.iter()) },
@@ -533,6 +533,18 @@ where
       None => None,
     }
   }
+
+  fn size_hint(&self) -> (usize, Option<usize>) {
+    match &self.tree_iter {
+      Some(it) => it.size_hint(),
+      None => (0, Some(0)),
+    }
+  }
+}
+
+impl<T> ExactSizeIterator for TernaryTreeListRefIntoIterator<'_, T> where
+  T: Clone + Display + Eq + PartialEq + Debug + Ord + PartialOrd + Hash
+{
 }
 
 impl<T: Clone + Display + Eq + PartialEq + Debug + Ord + PartialOrd + Hash> PartialEq for TernaryTreeList<T> {
@@ -608,12 +620,8 @@ where
     if xs.is_empty() {
       TernaryTreeList::Empty
     } else {
-      let mut ys: Vec<TernaryTree<T>> = Vec::with_capacity(xs.len());
-      for x in &xs {
-        ys.push(Leaf(x.to_owned()))
-      }
-
-      TernaryTreeList::Tree(TernaryTree::rebuild_list(xs.len(), 0, &ys, 2))
+      let size = xs.len();
+      TernaryTreeList::Tree(TernaryTree::from_values(size, xs))
     }
   }
 }
@@ -626,12 +634,7 @@ where
     if xs.is_empty() {
       TernaryTreeList::Empty
     } else {
-      let mut ys: Vec<TernaryTree<T>> = Vec::with_capacity(xs.len());
-      for x in xs {
-        ys.push(Leaf(x.to_owned()))
-      }
-
-      TernaryTreeList::Tree(TernaryTree::rebuild_list(xs.len(), 0, &ys, 2))
+      TernaryTreeList::Tree(TernaryTree::from_values(xs.len(), xs.iter().cloned()))
     }
   }
 }
@@ -645,12 +648,7 @@ where
     if xs.is_empty() {
       TernaryTreeList::Empty
     } else {
-      let mut ys: Vec<TernaryTree<T>> = Vec::with_capacity(xs.len());
-      for x in xs {
-        ys.push(Leaf(x.to_owned()))
-      }
-
-      TernaryTreeList::Tree(TernaryTree::rebuild_list(xs.len(), 0, &ys, 2))
+      TernaryTreeList::Tree(TernaryTree::from_values(xs.len(), xs.iter().cloned()))
     }
   }
 }

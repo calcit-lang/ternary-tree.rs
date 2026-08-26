@@ -22,6 +22,7 @@ keywords = ["ternary", "tree", "structual-sharing", "immutable"]
 criterion = "0.6.0"
 proptest = "1.5.0"
 fastrand = "2.1.0"
+rpds = "1.2.0"
 
 
 [[bench]]
@@ -46,6 +47,10 @@ harness = false
 
 [[bench]]
 name = "searching"
+harness = false
+
+[[bench]]
+name = "immutable_comparison"
 harness = false
 
 [profile.release]
