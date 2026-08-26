@@ -155,9 +155,10 @@ where
             right: Arc::new(item),
           }
         } else {
-          let changed_branch = middle.push_right_side(item.to_owned());
+          let item_size = item.len();
+          let changed_branch = middle.push_right_side(item);
           Branch2 {
-            size: size + item.len(),
+            size: size + item_size,
             left: left.to_owned(),
             middle: Arc::new(changed_branch),
           }
@@ -173,9 +174,10 @@ where
             middle: Arc::new(item),
           }
         } else {
-          let changed_branch = right.push_right_side(item.to_owned());
+          let item_size = item.len();
+          let changed_branch = right.push_right_side(item);
           Branch3 {
-            size: size + item.len(),
+            size: size + item_size,
             left: left.to_owned(),
             middle: middle.to_owned(),
             right: Arc::new(changed_branch),
@@ -203,9 +205,10 @@ where
             right: middle.to_owned(),
           }
         } else {
-          let changed_branch = left.push_left_side(item.to_owned());
+          let item_size = item.len();
+          let changed_branch = left.push_left_side(item);
           Branch2 {
-            size: size + item.len(),
+            size: size + item_size,
             left: Arc::new(changed_branch),
             middle: middle.to_owned(),
           }
@@ -221,9 +224,10 @@ where
             middle: Arc::new(self.to_owned()),
           }
         } else {
-          let changed_branch = left.push_left_side(item.to_owned());
+          let item_size = item.len();
+          let changed_branch = left.push_left_side(item);
           Branch3 {
-            size: size + item.len(),
+            size: size + item_size,
             left: Arc::new(changed_branch),
             middle: middle.to_owned(),
             right: right.to_owned(),

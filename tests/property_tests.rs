@@ -1,5 +1,6 @@
 use im_ternary_tree::TernaryTreeList;
 use proptest::prelude::*;
+use std::sync::Arc;
 
 proptest! {
   #[test]
@@ -58,5 +59,16 @@ proptest! {
     }
 
     prop_assert!(tree.is_empty(), "Tree should be empty after all elements are dropped");
+  }
+
+  #[test]
+  fn test_searches_match_vec(initial_data in prop::collection::vec(any::<u8>(), 0..1000), needle in any::<u8>()) {
+    let tree = TernaryTreeList::from(initial_data.clone());
+    let expected_first = initial_data.iter().position(|value| *value == needle);
+    let expected_from_end = initial_data.iter().rev().position(|value| *value == needle);
+
+    prop_assert_eq!(tree.index_of(&needle), expected_first);
+    prop_assert_eq!(tree.last_index_of(&needle), expected_from_end);
+    prop_assert_eq!(tree.find_index(Arc::new(move |value| *value == needle)), expected_first.map(|idx| idx as i64));
   }
 }

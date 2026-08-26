@@ -123,6 +123,73 @@ where
     }
   }
 
+  /// Builds the same finger-shaped layout as `rebuild_list`, but consumes
+  /// values directly so an owned input does not clone every element.
+  pub(crate) fn from_values<I>(size: usize, xs: I) -> Self
+  where
+    I: IntoIterator<Item = T>,
+  {
+    let mut iter = xs.into_iter();
+    let tree = Self::rebuild_values(size, &mut iter, 2);
+    debug_assert!(iter.next().is_none(), "from_values received more values than its size");
+    tree
+  }
+
+  fn rebuild_values<I>(size: usize, xs: &mut I, factor: u8) -> Self
+  where
+    I: Iterator<Item = T>,
+  {
+    match size {
+      0 => unreachable!("Does not work for empty list"),
+      1 => Leaf(xs.next().expect("from_values received fewer values than its size")),
+      2 | 3 => Self::rebuild_values_side(size, xs),
+      _ => {
+        let side_capacity = triple_size(factor - 1);
+        if side_capacity * 2 < size {
+          let middle_size = size - side_capacity * 2;
+          Branch3 {
+            size,
+            left: Arc::new(Self::rebuild_values_side(side_capacity, xs)),
+            middle: Arc::new(Self::rebuild_values(middle_size, xs, factor + 1)),
+            right: Arc::new(Self::rebuild_values_side(side_capacity, xs)),
+          }
+        } else {
+          Self::rebuild_values_side(size, xs)
+        }
+      }
+    }
+  }
+
+  fn rebuild_values_side<I>(size: usize, xs: &mut I) -> Self
+  where
+    I: Iterator<Item = T>,
+  {
+    match size {
+      0 => unreachable!("Does not work for empty list"),
+      1 => Leaf(xs.next().expect("from_values received fewer values than its size")),
+      2 => Branch2 {
+        size,
+        left: Arc::new(Leaf(xs.next().expect("from_values received fewer values than its size"))),
+        middle: Arc::new(Leaf(xs.next().expect("from_values received fewer values than its size"))),
+      },
+      3 => Branch3 {
+        size,
+        left: Arc::new(Leaf(xs.next().expect("from_values received fewer values than its size"))),
+        middle: Arc::new(Leaf(xs.next().expect("from_values received fewer values than its size"))),
+        right: Arc::new(Leaf(xs.next().expect("from_values received fewer values than its size"))),
+      },
+      _ => {
+        let (left_size, middle_size, right_size) = divide_ternary_sizes(size);
+        Branch3 {
+          size,
+          left: Arc::new(Self::rebuild_values_side(left_size, xs)),
+          middle: Arc::new(Self::rebuild_values_side(middle_size, xs)),
+          right: Arc::new(Self::rebuild_values_side(right_size, xs)),
+        }
+      }
+    }
+  }
+
   /// turn into a representation in triples, with `_` for holes
   pub fn format_inline(&self) -> String {
     match self {
@@ -139,80 +206,77 @@ where
   }
 
   pub fn find_index(&self, f: Arc<dyn Fn(&T) -> bool>) -> Option<i64> {
-    self.find_index_by(&*f)
+    self.find_index_by(&*f).map(|idx| idx as i64)
   }
 
-  fn find_index_by<F>(&self, f: &F) -> Option<i64>
+  fn find_index_by<F>(&self, f: &F) -> Option<usize>
   where
     F: Fn(&T) -> bool + ?Sized,
   {
-    let mut stack: Vec<(&TernaryTree<T>, i64)> = vec![(self, 0)];
-    while let Some((node, base)) = stack.pop() {
-      match node {
-        Leaf(value) => {
-          if f(value) {
-            return Some(base);
-          }
+    match self {
+      Leaf(value) => f(value).then_some(0),
+      Branch2 { left, middle, .. } => {
+        if let Some(idx) = left.find_index_by(f) {
+          Some(idx)
+        } else {
+          middle.find_index_by(f).map(|idx| left.len() + idx)
         }
-        Branch2 { left, middle, .. } => {
-          stack.push((middle, base + left.len() as i64));
-          stack.push((left, base));
-        }
-        Branch3 { left, middle, right, .. } => {
-          stack.push((right, base + left.len() as i64 + middle.len() as i64));
-          stack.push((middle, base + left.len() as i64));
-          stack.push((left, base));
+      }
+      Branch3 { left, middle, right, .. } => {
+        if let Some(idx) = left.find_index_by(f) {
+          Some(idx)
+        } else if let Some(idx) = middle.find_index_by(f) {
+          Some(left.len() + idx)
+        } else {
+          right.find_index_by(f).map(|idx| left.len() + middle.len() + idx)
         }
       }
     }
-    None
   }
 
   pub fn index_of(&self, item: &T) -> Option<usize> {
-    let mut stack: Vec<(&TernaryTree<T>, usize)> = vec![(self, 0)];
-    while let Some((node, base)) = stack.pop() {
-      match node {
-        Leaf(value) => {
-          if item == value {
-            return Some(base);
-          }
+    match self {
+      Leaf(value) => (item == value).then_some(0),
+      Branch2 { left, middle, .. } => {
+        if let Some(idx) = left.index_of(item) {
+          Some(idx)
+        } else {
+          middle.index_of(item).map(|idx| left.len() + idx)
         }
-        Branch2 { left, middle, .. } => {
-          stack.push((middle, base + left.len()));
-          stack.push((left, base));
-        }
-        Branch3 { left, middle, right, .. } => {
-          stack.push((right, base + left.len() + middle.len()));
-          stack.push((middle, base + left.len()));
-          stack.push((left, base));
+      }
+      Branch3 { left, middle, right, .. } => {
+        if let Some(idx) = left.index_of(item) {
+          Some(idx)
+        } else if let Some(idx) = middle.index_of(item) {
+          Some(left.len() + idx)
+        } else {
+          right.index_of(item).map(|idx| left.len() + middle.len() + idx)
         }
       }
     }
-    None
   }
 
   // index from end, returns 0 when item found at end of original list
   pub fn last_index_of(&self, item: &T) -> Option<usize> {
-    let mut stack: Vec<(&TernaryTree<T>, usize)> = vec![(self, 0)];
-    while let Some((node, base)) = stack.pop() {
-      match node {
-        Leaf(value) => {
-          if item == value {
-            return Some(base);
-          }
+    match self {
+      Leaf(value) => (item == value).then_some(0),
+      Branch2 { left, middle, .. } => {
+        if let Some(idx) = middle.last_index_of(item) {
+          Some(idx)
+        } else {
+          left.last_index_of(item).map(|idx| middle.len() + idx)
         }
-        Branch2 { left, middle, .. } => {
-          stack.push((left, base + middle.len()));
-          stack.push((middle, base));
-        }
-        Branch3 { left, middle, right, .. } => {
-          stack.push((left, base + middle.len() + right.len()));
-          stack.push((middle, base + right.len()));
-          stack.push((right, base));
+      }
+      Branch3 { left, middle, right, .. } => {
+        if let Some(idx) = right.last_index_of(item) {
+          Some(idx)
+        } else if let Some(idx) = middle.last_index_of(item) {
+          Some(right.len() + idx)
+        } else {
+          left.last_index_of(item).map(|idx| middle.len() + right.len() + idx)
         }
       }
     }
-    None
   }
 
   /// recursively check structure
@@ -1334,8 +1398,11 @@ where
     }
   }
 
-  pub fn iter(&self) -> TernaryTreeIterator<T> {
-    TernaryTreeIterator { stack: vec![(self, 0)] }
+  pub fn iter(&self) -> TernaryTreeIterator<'_, T> {
+    TernaryTreeIterator {
+      stack: vec![self],
+      remaining: self.len(),
+    }
   }
 }
 
@@ -1361,12 +1428,13 @@ where
   type IntoIter = TernaryTreeIterator<'a, T>;
 
   fn into_iter(self) -> Self::IntoIter {
-    TernaryTreeIterator { stack: vec![(self, 0)] }
+    self.iter()
   }
 }
 
 pub struct TernaryTreeIterator<'a, T> {
-  stack: Vec<(&'a TernaryTree<T>, u8)>,
+  stack: Vec<&'a TernaryTree<T>>,
+  remaining: usize,
 }
 
 impl<'a, T> Iterator for TernaryTreeIterator<'a, T>
@@ -1375,33 +1443,32 @@ where
 {
   type Item = &'a T;
   fn next(&mut self) -> Option<Self::Item> {
-    while let Some((node, stage)) = self.stack.pop() {
+    while let Some(node) = self.stack.pop() {
       match node {
-        Leaf(value) => return Some(value),
+        Leaf(value) => {
+          self.remaining -= 1;
+          return Some(value);
+        }
         Branch2 { left, middle, .. } => {
-          if stage == 0 {
-            self.stack.push((node, 1));
-            self.stack.push((left, 0));
-          } else {
-            self.stack.push((middle, 0));
-          }
+          self.stack.push(middle);
+          self.stack.push(left);
         }
         Branch3 { left, middle, right, .. } => {
-          if stage == 0 {
-            self.stack.push((node, 1));
-            self.stack.push((left, 0));
-          } else if stage == 1 {
-            self.stack.push((node, 2));
-            self.stack.push((middle, 0));
-          } else {
-            self.stack.push((right, 0));
-          }
+          self.stack.push(right);
+          self.stack.push(middle);
+          self.stack.push(left);
         }
       }
     }
     None
   }
+
+  fn size_hint(&self) -> (usize, Option<usize>) {
+    (self.remaining, Some(self.remaining))
+  }
 }
+
+impl<T> ExactSizeIterator for TernaryTreeIterator<'_, T> where T: Clone + Display + Eq + PartialEq + Debug + Ord + PartialOrd + Hash {}
 
 impl<T: Clone + Display + Eq + PartialEq + Debug + Ord + PartialOrd + Hash> PartialEq for TernaryTree<T> {
   fn eq(&self, ys: &Self) -> bool {
